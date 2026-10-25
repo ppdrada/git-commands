@@ -1,5 +1,7 @@
 # Funções comuns do git-commands (usadas pelo executável, pelos hooks e pelo agendador).
 # Compatível com bash 3.2. Sem heredoc: o bash 5.3 pode travar com heredoc dentro de hooks.
+# Sem case dentro de $(...): o bash 3.2 do Mac lê o ")" do padrão como o fim do $( e não
+# carrega o arquivo.
 
 case "${BASH_SOURCE[0]}" in
   */*|*\\*) GC_LIB_DIR="${BASH_SOURCE[0]%[/\\]*}" ;;

@@ -4,8 +4,9 @@
 # que entrega o .cmd ao cmd.exe.
 test_run_hook_como_o_claude_code_chama() {
   local r out; r=$(make_github_pair app)
-  out=$(printf '{"cwd":"%s","source":"startup"}' "$r" | CLAUDE_PLUGIN_ROOT="$PLUGIN" sh -c '"$1" session-start' sh "$PLUGIN/hooks/run-hook.cmd")
-  assert_contains "$out" "git-commands está ativo neste projeto (app)" ""
+  out=$(printf '{"cwd":"%s","source":"startup"}' "$r" | CLAUDE_PLUGIN_ROOT="$PLUGIN" sh -c '"$1" session-start' sh "$PLUGIN/hooks/run-hook.cmd" 2>&1)
+  # Numa linha só, para o CI mostrar a saída inteira se falhar.
+  assert_contains "$out" "git-commands está ativo neste projeto (app)" "saída: $(printf '%s' "$out" | tr '\r\n' '^|')"
 }
 
 # O sh do Mac é o bash 3.2 em modo POSIX, e o $BASH dele vale /bin/sh.

@@ -57,6 +57,8 @@ test_timeout() {
 }
 
 test_toplevel_sobe_ate_pasta_existente() {
-  . "$PLUGIN/lib/common.sh"; local r; r=$(make_local_repo l)
-  assert_eq "$(cd "$r" && pwd)" "$(cd "$(gc_toplevel "$r/nao/existe/a.txt")" && pwd)" ""
+  . "$PLUGIN/lib/common.sh"; local r t; r=$(make_local_repo l); : > "$r/.marca"
+  t=$(gc_toplevel "$r/nao/existe/a.txt") || fail "não achou o topo"
+  # Pela marca, e não pelo texto: o mesmo lugar tem nomes diferentes (/private/var no Mac, RUNNER~1 no Windows).
+  assert_file "$t/.marca" "o topo veio como $t"
 }

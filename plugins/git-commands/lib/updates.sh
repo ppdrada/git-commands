@@ -94,7 +94,7 @@ gc_updates_news() {
   local f out; f="$(gc_home)/status.tsv"
   [ -f "$f" ] || return 1
   out=$(while IFS=$'\t' read -r r name branch ahead behind dirty state; do
-    case "$state" in novidades|divergiu) ;; *) continue ;; esac
+    [ "$state" = novidades ] || [ "$state" = divergiu ] || continue
     [ -d "$r" ] || continue
     behind=$(git -C "$r" rev-list --count 'HEAD..@{u}' 2>/dev/null) || continue
     [ "${behind:-0}" -gt 0 ] && printf '%s\t%s\t%s\t%s\n' "$name" "$behind" "$r" "$state"
