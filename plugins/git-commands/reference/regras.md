@@ -20,6 +20,8 @@ Se a pessoa perguntar o que é alguma coisa, explique de novo, mesmo que já ten
 
 A explicação some com o tempo; a confirmação nunca some.
 
+Quando fizer mais de uma pergunta, numere. Se a resposta não disser a qual pergunta se refere (um "sim" sozinho, por exemplo), repita em uma linha o que entendeu e espere a confirmação antes de agir.
+
 ## 3. Mande o link do PR
 
 Sempre que abrir, juntar ou citar um PR, mande o link: `gh pr view <número> --json url --jq .url`.

@@ -24,17 +24,16 @@ Depois, peça para a pessoa fechar e abrir o Claude de novo, para o git aparecer
 - mac: `brew install gh` (sem Homebrew: https://cli.github.com)
 - linux: siga https://github.com/cli/cli/blob/trunk/docs/install_linux.md
 
-Se `gh_on_path=no` mas `gh_path` tem um caminho, o gh já está instalado e só não aparece nesta sessão: peça para reabrir o Claude.
+Depois de instalar, rode o `git-commands doctor` de novo. Se `gh_on_path=no` mas `gh_path` tem um caminho, o gh já está instalado e só não aparece pelo nome nesta sessão. Não peça para reabrir o Claude: até o fim da sessão, use o caminho completo (`"<gh_path>"` no lugar de `gh`).
 
 ## 3. Conta e login (`gh_auth=no`): quem faz é a pessoa
 
 - Sem conta: mande para https://github.com/signup e espere ela criar.
-- Login: o `gh auth login` precisa de uma janela de terminal de verdade, então quem roda é a pessoa. Passe exatamente:
-  1. Abrir um terminal (no Windows, o PowerShell ou o painel Terminal do app do Claude).
-  2. Rodar `gh auth login`.
-  3. Escolher GitHub.com → HTTPS → "Yes" para autenticar o git → "Login with a web browser".
-  4. Copiar o código que aparecer, apertar Enter, colar o código na página do GitHub e autorizar.
-- Quando ela disser que terminou: confira com `gh auth status` e rode `gh auth setup-git`.
+- Login (quem autoriza é a pessoa, no navegador):
+  1. Ofereça começar o login daqui. Com o ok, rode em segundo plano `gh auth login --web --hostname github.com --git-protocol https` e leia a saída: ela mostra um código de 8 caracteres (o gh também copia o código para a área de transferência) e o endereço https://github.com/login/device.
+  2. Mostre o código e o endereço, e peça para a pessoa abrir o endereço, colar o código, clicar em "Continue" e depois em "Authorize".
+  3. Quando o login terminar, confira com `gh auth status` e rode `gh auth setup-git`.
+- Se ela preferir fazer sozinha: abrir o PowerShell pelo menu Iniciar (uma janela nova já enxerga o gh recém-instalado), rodar `gh auth login` e escolher GitHub.com → HTTPS → "Yes" → "Login with a web browser". O código aparece nessa janela.
 - Nunca peça senha, token ou código para colar no chat.
 
 ## 4. Nome e e-mail do git (`user_name` ou `user_email` vazio) [conceito: git-config]
@@ -61,8 +60,8 @@ Explique que, desligado, o plugin só age quando a pessoa pede.
 
 | Erro | Certo |
 |---|---|
-| Rodar `gh auth login` pelo Claude | Ele precisa de terminal de verdade: a pessoa roda e o Claude guia |
+| Mandar a pessoa achar o código do login sozinha | Começar o login daqui e mostrar o código e o endereço |
 | Pedir senha, token ou código no chat | O login acontece só no navegador, no site do GitHub |
-| Dizer que o gh não está instalado logo depois do winget | Se há `gh_path`, pedir para reabrir o Claude |
+| Pedir para reabrir o Claude logo depois do winget | Usar o caminho completo do gh (`gh_path`) até o fim da sessão |
 | Inventar nome ou e-mail | Perguntar, oferecendo o e-mail privado do GitHub |
 | Esquecer a pasta de projetos | Perguntar quando `projects_dir` estiver vazio |
