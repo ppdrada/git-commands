@@ -14,6 +14,20 @@ find "$(gc_home)/sessions" -mindepth 1 -maxdepth 1 -type d -mtime +2 -exec rm -r
 gc_cwd=$(gc_json_field "$gc_input" cwd) || gc_cwd=$PWD
 gc_cwd=$(gc_norm_path "$gc_cwd")
 
+# Com a verificação automática ligada: mantém a cópia do agendador em dia e conta as
+# novidades da última verificação (sem rede: o agendador é que fala com o GitHub).
+if [ "$(gc_config_get auto_check)" = on ]; then
+  gc_app_sync 2>/dev/null
+  if gc_novas=$(gc_updates_news); then
+    gc_lista=$(printf '%s\n' "$gc_novas" | awk -F'\t' '{ printf "%s%s (%s)", (NR > 1 ? ", " : ""), $1, $2 }')
+    {
+      printf '%s\n' \
+        "Novidades no GitHub: $gc_lista." \
+        "Na sua primeira resposta, conte isso à pessoa em uma frase e pergunte se ela quer ver agora (skill git-commands:atualizar). Não atualize nada sozinho."
+    } 2>/dev/null
+  fi
+fi
+
 if gc_proactive_applies "$gc_cwd"; then
   gc_top=$(gc_toplevel "$gc_cwd")
   gc_nome=${gc_top##*/}

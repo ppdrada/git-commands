@@ -36,6 +36,21 @@ gc_plugin_version() {
   fi
 }
 
+# Cópia do executável para <home>/app, que é o que o agendador do sistema roda: o caminho
+# do plugin muda a cada atualização, o de <home>/app não. Só recopia quando a versão muda.
+gc_app_sync() {
+  local app v tmp
+  app="$(gc_home)/app"; v=$(gc_plugin_version)
+  [ -n "$v" ] || return 0
+  [ -f "$app/VERSION" ] && [ "$(cat "$app/VERSION")" = "$v" ] && return 0
+  tmp="$app.tmp.$$"
+  rm -rf "$tmp" && mkdir -p "$tmp" || return 1
+  cp -R "$GC_ROOT/bin" "$GC_ROOT/lib" "$tmp/" || { rm -rf "$tmp"; return 1; }
+  [ -d "$GC_ROOT/scheduler" ] && cp -R "$GC_ROOT/scheduler" "$tmp/"
+  printf '%s\n' "$v" > "$tmp/VERSION"
+  rm -rf "$app" && mv "$tmp" "$app"
+}
+
 # Rede sem perguntas: nada de pedir senha no terminal nem abrir janela de login.
 gc_quiet_net() { export GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never; }
 
