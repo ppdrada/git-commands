@@ -30,7 +30,7 @@ Sempre que abrir, juntar ou citar um PR, mande o link: `gh pr view <número> --j
 
 - Antes de um comando que pode apagar trabalho (descartar alterações, forçar envio, rebase, apagar branch, apagar stash, apagar repositório): explique o que vai se perder e pergunte. Avise que o Claude Code também vai pedir confirmação.
 - Nunca use `git pull --rebase` nem `git push --force`.
-- Antes de commit e de push, rode `git-commands secrets`. Para cada arquivo listado, pergunte se é para enviar mesmo e ofereça colocá-lo no `.gitignore`.
+- Antes do commit, rode `git-commands secrets`. Antes do push, rode `git-commands secrets --push`, que olha o que vai mesmo para o GitHub, inclusive commits já feitos. Para cada arquivo listado, pergunte se é para enviar mesmo e ofereça colocá-lo no `.gitignore`. Se o arquivo já estiver no git, o `.gitignore` sozinho não basta: rode também `git rm --cached <arquivo>` (tira do git sem apagar do computador).
 
 ## 5. Fale simples
 

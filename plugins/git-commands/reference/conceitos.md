@@ -18,7 +18,7 @@ O `git add` escolhe quais alterações vão entrar no próximo commit. É como s
 O README é o arquivo de apresentação do projeto: é a primeira coisa que aparece na página do repositório no GitHub. Ele conta o que é o projeto e como usar.
 
 ## gitignore
-O `.gitignore` é a lista de arquivos que o git deve ignorar, como senhas, arquivos temporários e pastas geradas automaticamente. O que está nessa lista nunca vai para o GitHub.
+O `.gitignore` é a lista de arquivos que o git deve ignorar, como senhas, arquivos temporários e pastas geradas automaticamente. Arquivos dessa lista não entram nos próximos commits; se um deles já estava no git, é preciso tirá-lo com `git rm --cached`.
 
 ## remote
 O remote é o endereço da cópia do projeto no GitHub. O nome padrão dele é `origin`.

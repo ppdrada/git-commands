@@ -24,6 +24,34 @@ test_secrets_tabela() {
   assert_contains "$out" "aws.cfg	parece uma chave de API" ""
 }
 
+test_secrets_push_ve_commit_ainda_nao_enviado() {
+  local r; r=$(make_github_pair app); echo "SENHA=1" > "$r/.env"; git -C "$r" add .env; git -C "$r" commit -qm "env"
+  assert_exit 0 gc secrets "$r"
+  local out; out=$(gc secrets --push "$r"); assert_eq "3" "$?" "o .env vai junto no push"
+  assert_contains "$out" ".env	arquivo .env (senhas e chaves)" ""
+}
+
+test_secrets_push_le_o_conteudo_do_commit() {
+  local r; r=$(make_github_pair app); echo "t='gho_$(printf 'b%.0s' $(seq 36))'" > "$r/config.js"
+  git -C "$r" add config.js; git -C "$r" commit -qm "config"; echo "limpo" > "$r/config.js"
+  assert_contains "$(gc secrets --push "$r")" "config.js	parece um token do GitHub" "o que vai é o conteúdo do commit"
+}
+
+test_secrets_push_sem_upstream_olha_tudo() {
+  local r; r=$(make_local_repo s); echo "SENHA=1" > "$r/.env"; git -C "$r" add .env; git -C "$r" commit -qm "env"
+  assert_contains "$(gc secrets --push "$r")" ".env	arquivo .env" ""
+}
+
+test_secrets_formatos_novos_de_chave() {
+  local r; r=$(make_local_repo s)
+  echo "k=sk-ant-api03-$(printf 'x%.0s' $(seq 30))" > "$r/a.cfg"
+  echo "k=sk-proj-$(printf 'y%.0s' $(seq 30))" > "$r/b.cfg"
+  echo "k=gho_$(printf 'z%.0s' $(seq 36))" > "$r/c.cfg"
+  local out; out=$(gc secrets "$r")
+  assert_contains "$out" "a.cfg	parece uma chave de API" "Anthropic"; assert_contains "$out" "b.cfg	parece uma chave de API" "OpenAI"
+  assert_contains "$out" "c.cfg	parece um token do GitHub" "token OAuth do gh"
+}
+
 test_secrets_ignorado_nao_conta() { local r; r=$(make_local_repo s); echo ".env" > "$r/.gitignore"; echo x > "$r/.env"; assert_exit 0 gc secrets "$r"; }
 
 test_secrets_env_ja_preparado_conta() { local r; r=$(make_local_repo s); echo x > "$r/.env"; git -C "$r" add .env; assert_contains "$(gc secrets "$r")" ".env	arquivo .env" "sem --staged também olha o que já foi preparado"; }

@@ -27,6 +27,7 @@ Pressa não pula passo: com pressa, fale menos, mas faça as mesmas perguntas e 
    - Dono: `gh api user --jq .login`.
    - Se `gh repo view <dono>/<nome>` funcionar, o repositório já existe: pergunte se usa esse ou escolhe outro nome. Para usar, `git remote add origin <url>`; se ele já tiver commits, `git pull origin main --allow-unrelated-histories --no-rebase` e resolva conflitos como na skill `git-commands:atualizar` [conceito: conflito].
    - Se não existir: `gh repo create <nome> --public` (ou `--private`) `--source . --remote origin` [conceito: remote].
+   - Antes de enviar, rode `git-commands secrets --push` e pergunte sobre cada arquivo listado (regra 4).
    - `git push -u origin main` [conceito: push].
    - Mande o link: `gh repo view --json url --jq .url`.
 8. **Verificação automática.** Se `git-commands config get auto_check_asked` vier vazio, pergunte se a pessoa quer que o plugin procure novidades sozinho a cada 30 minutos (skill `git-commands:verificacao-automatica`).
