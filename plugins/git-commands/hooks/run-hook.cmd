@@ -21,4 +21,10 @@ case "$0" in
 esac
 gc_script="$1"
 shift
-exec "${BASH:-bash}" "$gc_dir/$gc_script" "$@"
+# Chamado pelo sh (o Claude Code usa sh -c no Mac e no Linux), o $BASH vale /bin/sh: no Mac é
+# o bash em modo POSIX, no Linux nem é bash. Aí usa o bash do PATH.
+case "${BASH:-}" in
+  */bash|*/bash.exe) gc_bash=$BASH ;;
+  *) gc_bash=bash ;;
+esac
+exec "$gc_bash" "$gc_dir/$gc_script" "$@"

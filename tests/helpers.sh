@@ -2,7 +2,7 @@
 ROOT="${ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 PLUGIN="$ROOT/plugins/git-commands"
 
-gc() { bash "$PLUGIN/bin/git-commands" "$@"; }
+gc() { "$BASH" "$PLUGIN/bin/git-commands" "$@"; }
 
 fail() { printf 'FALHOU: %s\n' "$*"; exit 1; }
 skip() { printf 'PULADO: %s\n' "$*"; exit 77; }

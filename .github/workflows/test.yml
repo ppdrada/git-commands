@@ -20,9 +20,17 @@ jobs:
           git config --global user.name ci
           git config --global user.email ci@example.com
 
-      - name: Testes com o bash do macOS (3.2)
+      - name: Versões do bash
+        shell: bash
+        run: |
+          echo "bash do PATH: $(command -v bash)"; bash --version | head -n 1
+          echo "/bin/bash:"; /bin/bash --version | head -n 1 || true
+
+      - name: Testes com o bash do macOS (3.2) e o launchd de verdade
         if: runner.os == 'macOS'
         shell: bash
+        env:
+          GIT_COMMANDS_TEST_REAL_SCHEDULE: "1"
         run: /bin/bash tests/run.sh
 
       - name: Testes (com o agendador de verdade)

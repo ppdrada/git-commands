@@ -1,6 +1,6 @@
 # Testes do hook pre-edit (checagem de novidades antes da primeira edição).
 
-pe() { printf '{"session_id":"%s","tool_name":"Edit","tool_input":{"file_path":"%s"}%s}' "$1" "$2" "${3:-}" | CLAUDE_PLUGIN_ROOT="$PLUGIN" bash "$PLUGIN/hooks/run-hook.cmd" pre-edit; }
+pe() { printf '{"session_id":"%s","tool_name":"Edit","tool_input":{"file_path":"%s"}%s}' "$1" "$2" "${3:-}" | CLAUDE_PLUGIN_ROOT="$PLUGIN" "$BASH" "$PLUGIN/hooks/run-hook.cmd" pre-edit; }
 
 test_pre_edit_bloqueia_uma_vez_quando_atras() {
   local a; a=$(make_github_pair app); push_remote_commit app n.txt "um"

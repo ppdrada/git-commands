@@ -46,17 +46,17 @@ test_guard_comando_longo_rapido() {
 }
 
 test_guard_hook_pede_confirmacao() {
-  local out; out=$(printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git reset --hard"}}' | CLAUDE_PLUGIN_ROOT="$PLUGIN" bash "$PLUGIN/hooks/run-hook.cmd" guard)
+  local out; out=$(printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git reset --hard"}}' | CLAUDE_PLUGIN_ROOT="$PLUGIN" "$BASH" "$PLUGIN/hooks/run-hook.cmd" guard)
   assert_contains "$out" '"permissionDecision":"ask"' ""; assert_contains "$out" "descarta alterações que ainda não foram salvas" ""
 }
 
 test_guard_hook_usa_a_pasta_do_comando() {
   local r; r=$(make_local_repo app); : > "$r/menu.html"
-  local out; out=$(printf '{"cwd":"%s","tool_input":{"command":"git checkout menu.html"}}' "$r" | CLAUDE_PLUGIN_ROOT="$PLUGIN" bash "$PLUGIN/hooks/run-hook.cmd" guard)
+  local out; out=$(printf '{"cwd":"%s","tool_input":{"command":"git checkout menu.html"}}' "$r" | CLAUDE_PLUGIN_ROOT="$PLUGIN" "$BASH" "$PLUGIN/hooks/run-hook.cmd" guard)
   assert_contains "$out" "descarta" "menu.html é arquivo na pasta do comando"
 }
 
 test_guard_hook_silencioso_em_comando_seguro() {
-  local out; out=$(printf '%s' '{"tool_input":{"command":"git status"}}' | CLAUDE_PLUGIN_ROOT="$PLUGIN" bash "$PLUGIN/hooks/run-hook.cmd" guard)
+  local out; out=$(printf '%s' '{"tool_input":{"command":"git status"}}' | CLAUDE_PLUGIN_ROOT="$PLUGIN" "$BASH" "$PLUGIN/hooks/run-hook.cmd" guard)
   assert_eq "0" "$?" "o hook rodou e saiu com 0"; assert_eq "" "$out" "nada impresso"
 }

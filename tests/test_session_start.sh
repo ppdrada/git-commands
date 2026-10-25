@@ -1,6 +1,6 @@
 # Testes do hook session-start (contexto na abertura do Claude).
 
-ss() { printf '{"cwd":"%s","source":"startup"}' "$1" | CLAUDE_PLUGIN_ROOT="$PLUGIN" bash "$PLUGIN/hooks/run-hook.cmd" session-start; }
+ss() { printf '{"cwd":"%s","source":"startup"}' "$1" | CLAUDE_PLUGIN_ROOT="$PLUGIN" "$BASH" "$PLUGIN/hooks/run-hook.cmd" session-start; }
 
 test_ss_fora_de_repo_silencioso() { local out; out=$(ss "$SANDBOX"); assert_eq "0" "$?" "o hook rodou"; assert_eq "" "$out" ""; }
 
