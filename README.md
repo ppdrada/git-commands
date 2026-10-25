@@ -77,6 +77,7 @@ O progresso (conceitos já explicados e configurações) fica na pasta `~/.git-c
 - Testes: `bash tests/run.sh` (ou `bash tests/run.sh <parte do nome>` para rodar só alguns).
 - No GitHub, os testes rodam em Windows, macOS (com o bash 3.2) e Linux a cada envio.
 - Validação: `claude plugin validate plugins/git-commands --strict`.
+- Avaliações de comportamento (o Claude pergunta antes de agir?): `claude plugin eval plugins/git-commands --scaffold --ablation none --allow-tools Bash Read`. Rodam no macOS e no Linux; no Windows o Claude Code recusa, porque não consegue isolar os comandos do terminal.
 - O design e o plano de construção estão em `docs/superpowers/`.
 
 ## Licença
