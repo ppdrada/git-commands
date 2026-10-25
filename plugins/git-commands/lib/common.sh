@@ -54,7 +54,15 @@ gc_app_sync() {
 }
 
 # Rede sem perguntas: nada de pedir senha no terminal nem abrir janela de login.
-gc_quiet_net() { export GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never; }
+# O git tenta os programas de senha (GIT_ASKPASS, SSH_ASKPASS) antes de olhar o
+# GIT_TERMINAL_PROMPT, e o login do Git Bash deixa um deles definido: por isso vão vazios.
+# No SSH, BatchMode faz falhar em vez de perguntar senha ou chave do servidor.
+gc_quiet_net() {
+  export GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never GIT_ASKPASS= SSH_ASKPASS= SSH_ASKPASS_REQUIRE=never
+  if [ -z "${GIT_SSH_COMMAND:-}" ] && [ -z "$(git config --get core.sshCommand 2>/dev/null)" ]; then
+    export GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=10'
+  fi
+}
 
 # ---------- configuração ----------
 
