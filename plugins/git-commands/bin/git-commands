@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# git-commands: o executável do plugin (fica no PATH do Bash tool enquanto o plugin está ligado).
+# Uso: git-commands <subcomando> [argumentos]
+
+case "$0" in
+  */*|*\\*) GC_BIN_DIR="${0%[/\\]*}" ;;
+  *) GC_BIN_DIR="$(command -v -- "$0")"; GC_BIN_DIR="${GC_BIN_DIR%/*}" ;;
+esac
+
+for gc_lib in "$GC_BIN_DIR"/../lib/*.sh; do
+  . "$gc_lib"
+done
+
+gc_usage() {
+  printf 'uso: git-commands <subcomando> [argumentos]\n' >&2
+  printf 'subcomandos: home, os, config, learned, doctor, secrets, guard, proactive, updates, schedule\n' >&2
+}
+
+gc_sub="${1:-}"
+[ $# -gt 0 ] && shift
+case "$gc_sub" in
+  *[!a-z]*|"") gc_usage; exit 1 ;;
+esac
+if type "gc_cmd_$gc_sub" >/dev/null 2>&1; then
+  "gc_cmd_$gc_sub" "$@"
+else
+  gc_usage
+  exit 1
+fi
