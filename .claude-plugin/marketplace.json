@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "git-commands",
+  "description": "Git e GitHub para quem está começando: o Claude faz os comandos, explica e pede confirmação.",
+  "owner": {
+    "name": "ppdrada"
+  },
+  "plugins": [
+    {
+      "name": "git-commands",
+      "source": "./plugins/git-commands",
+      "description": "Git e GitHub para quem está começando: o Claude faz os comandos, explica e pede confirmação."
+    }
+  ]
+}

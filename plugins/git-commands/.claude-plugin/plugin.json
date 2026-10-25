@@ -1,0 +1,13 @@
+{
+  "name": "git-commands",
+  "displayName": "Git Commands",
+  "version": "0.1.0",
+  "description": "Git e GitHub para quem está começando: o Claude faz os comandos, explica e pede confirmação.",
+  "author": {
+    "name": "ppdrada"
+  },
+  "homepage": "https://github.com/ppdrada/git-commands",
+  "repository": "https://github.com/ppdrada/git-commands",
+  "license": "MIT",
+  "keywords": ["git", "github", "iniciantes", "pt-br"]
+}

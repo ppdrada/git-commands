@@ -1,0 +1,5 @@
+plugins/git-commands/evals/results/
+*.log
+.DS_Store
+Thumbs.db
+.worktrees/
