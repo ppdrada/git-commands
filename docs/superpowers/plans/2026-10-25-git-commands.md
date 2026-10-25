@@ -26,8 +26,8 @@
 - Frase fixa da spec para o conceito `repositorio`: "git init é criar ou inicializar um novo repositório Git em um diretório do seu computador."
 - Toda mensagem de commit criada pelo Claude neste trabalho termina com a linha `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Mensagens em pt-BR, no imperativo.
 - Partes e branches: Parte 1 direto na `main` (publicação inicial). Partes 2, 3 e 4 em `parte-2-dia-a-dia`, `parte-3-atualizacoes` e `parte-4-ci-e-migracao`, cada uma publicada por PR feito pelo próprio plugin.
-- Nada vai para o GitHub (criar repositório, push, PR, tag) sem o usuário mandar. As Tasks 7, 11, 17 e 21 só começam quando ele pedir; até lá, tudo fica só no computador dele.
-- A documentação do repositório é pública: nada de nomes de pessoas nem de projetos pessoais. Use "o usuário" e "o projeto".
+- Nada vai para o GitHub (criar repositório, push, PR, tag) sem o Dev mandar. As Tasks 7, 11, 17 e 21 só começam quando ele pedir; até lá, tudo fica só no computador dele.
+- A documentação do repositório é pública: nada de nomes de pessoas nem de projetos pessoais. Use "o Dev" e "o projeto".
 
 ## Review Focus
 
@@ -359,7 +359,7 @@ test_secrets_repo_limpo() { local r; r=$(make_local_repo s); assert_exit 0 gc se
   - O corpo segue a spec 4.1, passos 1 a 9, nesta ordem:
     1. Rodar `doctor` e mandar para a skill `configurar` o que faltar.
     2. Conferir o git config.
-    3. Perguntar o nome do repositório e se é público ou privado [conceito: publico-privado].
+    3. Perguntar o nome do repositório, se é público ou privado [conceito: publico-privado] e se a pessoa quer o Claude como colaborador. A resposta vai para `git config git-commands.coauthor true|false` depois do `git init`; se for sim, os commits levam a linha `Co-Authored-By: Claude <noreply@anthropic.com>`.
     4. Perguntar a pasta: se já existe uma pasta com o código, usar ela; se não, criar `<projects_dir>/<nome>`.
     5. `git init -b main` [conceito: repositorio]. Se já for repositório, dizer isso e pular.
     6. README [conceito: readme]: perguntar do que se trata, mostrar o rascunho e criar depois do ok. Se já existir, mostrar e perguntar se quer mudar.
@@ -384,12 +384,12 @@ test_secrets_repo_limpo() { local r; r=$(make_local_repo s); assert_exit 0 gc se
 Run: `claude plugin marketplace add "<caminho desta pasta>"` e depois `claude plugin install git-commands@git-commands`.
 Expected: `Successfully installed plugin: git-commands@git-commands`.
 
-- [ ] **Step 2: O usuário abre uma sessão nova nesta pasta e diz "quero colocar este projeto no GitHub"**
+- [ ] **Step 2: O Dev abre uma sessão nova nesta pasta e diz "quero colocar este projeto no GitHub"**
 
-O usuário conduz a conversa e o Claude não faz nada por ele.
+O Dev conduz a conversa e o Claude não faz nada por ele.
 Critérios de aceite:
 - (a) a skill `git-commands:novo-projeto` é usada;
-- (b) o `gh` é instalado com o comando do Windows mostrado pelo plugin, e o usuário faz o login ele mesmo;
+- (b) o `gh` é instalado com o comando do Windows mostrado pelo plugin, e o Dev faz o login ele mesmo;
 - (c) a pasta já ser repositório é tratada sem erro;
 - (d) o nome `git-commands` e "público" são perguntados;
 - (e) cada conceito é explicado uma única vez;
@@ -400,7 +400,7 @@ Critérios de aceite:
 Run: `gh repo view ppdrada/git-commands --json visibility,url` → `"visibility":"PUBLIC"`.
 Run: `git status -sb` → `## main...origin/main`.
 
-- [ ] **Step 4: Anotar no fim deste plano** o que o usuário estranhou, como ajustes para a Parte 2.
+- [ ] **Step 4: Anotar no fim deste plano** o que o Dev estranhou, como ajustes para a Parte 2.
 
 ---
 
@@ -541,6 +541,7 @@ test_ss_cwd_com_barras_invertidas() { local r; r=$(make_github_pair app); [ "$(g
     - Mostrar `git status --short` em palavras simples [conceito: add] [conceito: commit].
     - Rodar `git-commands secrets` e perguntar sobre cada arquivo encontrado, oferecendo colocá-lo no `.gitignore`.
     - Sugerir a mensagem em pt-BR, no imperativo, com até 72 caracteres. Perguntar "Quer mudar alguma coisa nessa mensagem?" e só fazer `git add` e `git commit` depois do ok, aceitando a mensagem editada.
+    - Claude como colaborador: ler `git config --get git-commands.coauthor`. Vazio → perguntar uma vez e gravar `true` ou `false` no repositório. `true` → a mensagem mostrada já leva a linha `Co-Authored-By: Claude <noreply@anthropic.com>`.
     - Oferecer o push [conceito: push], usando `-u origin <branch>` se faltar upstream. Se o push for recusado, explicar e ir para a skill `atualizar` (nunca forçar).
     - Se existir PR aberto para a branch, mandar o link.
 - [ ] **Step 2: Escrever `branch-e-pr`**
@@ -566,7 +567,7 @@ test_ss_cwd_com_barras_invertidas() { local r; r=$(make_github_pair app); [ "$(g
 ### Task 11: Publicar a Parte 2 por PR, usando o plugin
 
 - [ ] **Step 1:** atualizar o plugin instalado: `claude plugin marketplace update git-commands` e depois `claude plugin update git-commands@git-commands`.
-- [ ] **Step 2: O usuário, numa sessão nova nesta pasta, diz "terminei a parte 2, manda pro GitHub"**
+- [ ] **Step 2: O Dev, numa sessão nova nesta pasta, diz "terminei a parte 2, manda pro GitHub"**
 
 Critérios de aceite:
 - (a) a mensagem de cada commit pendente é mostrada e confirmada;
@@ -799,7 +800,7 @@ test_schedule_real_ida_e_volta() {
 ```
 
 - [ ] **Step 2: Ver falhar** · **Step 3: Implementar (e `make_crontab_stub` em `helpers.sh`)** · **Step 4: Ver passar**
-- [ ] **Step 5: Teste real no Windows do usuário** — `GIT_COMMANDS_TEST_REAL_SCHEDULE=1 bash tests/run.sh schedule` → PASS. Depois, `Get-ScheduledTask -TaskName git-commands-verificar` não encontra nada (foi removida).
+- [ ] **Step 5: Teste real no Windows do Dev** — `GIT_COMMANDS_TEST_REAL_SCHEDULE=1 bash tests/run.sh schedule` → PASS. Depois, `Get-ScheduledTask -TaskName git-commands-verificar` não encontra nada (foi removida).
 - [ ] **Step 6: Commit** — `git add --chmod=+x plugins/git-commands/scheduler/run-scheduled`; `git commit -m "Adiciona a verificação automática para Windows, macOS e Linux"`.
 
 ### Task 16: Skills `atualizar` e `verificacao-automatica` e o agente `git`
@@ -843,12 +844,12 @@ test_schedule_real_ida_e_volta() {
 ### Task 17: Publicar a Parte 3 por PR, usando o plugin
 
 - [ ] **Step 1:** atualizar o plugin instalado (como na Task 11).
-- [ ] **Step 2: O usuário, numa sessão nova, diz "tem algo novo nos meus projetos?" e depois "manda a parte 3 pro GitHub"**
+- [ ] **Step 2: O Dev, numa sessão nova, diz "tem algo novo nos meus projetos?" e depois "manda a parte 3 pro GitHub"**
 
 Critérios de aceite:
 - (a) a lista mostra só os projetos com novidade e pergunta o que fazer;
 - (b) nada é atualizado sem resposta;
-- (c) a pergunta sobre a verificação automática aparece uma vez (o usuário responde "agora não"; ela é ligada na Task 20);
+- (c) a pergunta sobre a verificação automática aparece uma vez (o Dev responde "agora não"; ela é ligada na Task 20);
 - (d) o PR é aberto, o link aparece e o PR é juntado.
 
 ---
@@ -908,12 +909,12 @@ Critérios de aceite:
 Run: `cp -r ~/.git-commands ~/.git-commands.bak 2>/dev/null; GIT_COMMANDS_HOME="$(mktemp -d)" claude plugin eval plugins/git-commands --scaffold --ablation none --allow-tools Bash Read --max-cost-usd 5; rm -rf ~/.git-commands && mv ~/.git-commands.bak ~/.git-commands 2>/dev/null`
 Expected: os 5 casos passam.
 
-- [ ] **Step 3:** se algum caso falhar, ajustar o texto da skill (não o caso) e rodar de novo, no máximo 2 vezes. O que continuar falhando vai para o usuário com a explicação do juiz.
+- [ ] **Step 3:** se algum caso falhar, ajustar o texto da skill (não o caso) e rodar de novo, no máximo 2 vezes. O que continuar falhando vai para o Dev com a explicação do juiz.
 - [ ] **Step 4: Commit** — `git commit -m "Adiciona avaliações de comportamento das skills"`.
 
-### Task 20: Migração no PC do usuário e instalação pelo GitHub
+### Task 20: Migração no PC do Dev e instalação pelo GitHub
 
-- [ ] **Step 1: Perguntar ao usuário**, mostrando a lista, se pode:
+- [ ] **Step 1: Perguntar ao Dev**, mostrando a lista, se pode:
   - remover a skill `~/.claude/skills/git-sync`;
   - remover o agente `~/.claude/agents/git.md`;
   - remover a tarefa agendada `git-sync` do Windows (que faz pull sozinha).
@@ -932,13 +933,13 @@ Run:
 
 Expected: `claude plugin list` mostra `git-commands@git-commands` habilitado, e `~/.git-commands/learned` continua com os conceitos aprendidos.
 
-- [ ] **Step 4: O usuário, numa sessão nova, diz "quero que verifique sozinho a cada 30 minutos"**
+- [ ] **Step 4: O Dev, numa sessão nova, diz "quero que verifique sozinho a cada 30 minutos"**
 
 Expected: `git-commands schedule status` → `ligado 30`; `Get-ScheduledTask -TaskName git-commands-verificar` → `Ready`. 30 minutos depois, `~/.git-commands/check.log` tem uma linha `verificação ok`.
 
 ### Task 21: Publicar a Parte 4 e lançar a versão 1.0.0
 
 - [ ] **Step 1:** `version` para `1.0.0` em `plugin.json`; `claude plugin validate plugins/git-commands --strict`.
-- [ ] **Step 2: O usuário, numa sessão nova, publica a Parte 4 com o plugin** (PR, link e merge), com o CI verde nos três sistemas.
+- [ ] **Step 2: O Dev, numa sessão nova, publica a Parte 4 com o plugin** (PR, link e merge), com o CI verde nos três sistemas.
 - [ ] **Step 3: Marcar a versão** — `git switch main && git pull --ff-only`, depois `claude plugin tag plugins/git-commands` e `git push origin --tags`. Expected: a tag `git-commands--v1.0.0` aparece em `gh release list` ou `git ls-remote --tags origin`.
 - [ ] **Step 4: Teste final de instalação limpa.** Num usuário ou máquina sem o plugin (ou depois de `claude plugin uninstall`), seguir o README do zero. Expected: instala e `/git-commands:novo-projeto` aparece.

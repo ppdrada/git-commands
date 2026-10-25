@@ -1,0 +1,30 @@
+# Senhas e chaves: nunca vão para o GitHub
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Ambiente e arquivos gerados
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.vscode/
+.idea/
+*.swp
+
+# Temporários e logs
+*.log
+*.tmp

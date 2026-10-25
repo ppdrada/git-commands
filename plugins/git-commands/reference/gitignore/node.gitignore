@@ -1,0 +1,28 @@
+# Senhas e chaves: nunca vão para o GitHub
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Dependências e arquivos gerados
+node_modules/
+dist/
+build/
+.next/
+coverage/
+npm-debug.log*
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.vscode/
+.idea/
+*.swp
+
+# Temporários e logs
+*.log
+*.tmp
