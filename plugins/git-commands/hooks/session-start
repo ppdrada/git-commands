@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Hook SessionStart: quando o Claude abre num projeto do GitHub com o modo automático ligado,
+# põe no contexto as regras do git-commands. Rápido e sem rede: o Claude espera este hook.
+PATH="/usr/bin:/bin:/mingw64/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
+case "$0" in */*|*\\*) gc_hook_dir="${0%[/\\]*}" ;; *) gc_hook_dir=. ;; esac
+gc_hook_dir=$(cd "$gc_hook_dir" && pwd)
+for gc_lib in "$gc_hook_dir"/../lib/*.sh; do . "$gc_lib"; done
+
+gc_input=$(cat)
+gc_cwd=$(gc_json_field "$gc_input" cwd) || gc_cwd=$PWD
+gc_cwd=$(gc_norm_path "$gc_cwd")
+
+if gc_proactive_applies "$gc_cwd"; then
+  gc_top=$(gc_toplevel "$gc_cwd")
+  gc_nome=${gc_top##*/}
+  gc_aprendidos=$(gc_cmd_learned list | tr '\n' ',' | sed 's/,$//; s/,/, /g')
+  [ -n "$gc_aprendidos" ] || gc_aprendidos="nenhum"
+  gc_raiz=${CLAUDE_PLUGIN_ROOT:-$GC_ROOT}
+  {
+    printf '%s\n' \
+      "git-commands está ativo neste projeto ($gc_nome), que está ligado ao GitHub." \
+      "Ao conversar com a pessoa sobre este projeto, siga as regras do git-commands (detalhes em $gc_raiz/reference/regras.md):" \
+      "- Antes de começar uma mudança nova, pergunte se ela quer criar uma branch (skill git-commands:branch-e-pr)." \
+      "- Commit: mostre a mensagem sugerida e pergunte se ela quer mudar; só faça o commit depois do ok (skill git-commands:salvar)." \
+      "- Tudo que mexe no GitHub (push, criar repositório, abrir ou juntar PR): mostre o que vai fazer e peça ok. Sempre mande o link do PR." \
+      "- Quando a mudança terminar, ofereça salvar (commit) e, se estiver numa branch, abrir o PR." \
+      "- Na primeira vez que um conceito de git aparecer, explique em 1 ou 2 frases e registre com \`git-commands learned add <id>\`. Conceitos já explicados para esta pessoa: $gc_aprendidos." \
+      "- Essas regras valem na conversa com a pessoa; ajudantes e automações (subagentes) seguem sem interrupção."
+  } 2>/dev/null
+fi
+exit 0
