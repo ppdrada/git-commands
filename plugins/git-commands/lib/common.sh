@@ -133,10 +133,13 @@ gc_toplevel() {
 
 # ---------- JSON (sem jq) ----------
 
+# As funções terminadas em _to gravam o resultado na variável cujo nome vem em $1, sem
+# subshell: no Windows cada subshell custa caro, e os hooks rodam a cada comando ou edição.
+
 # As substituições ficam sem aspas em volta e com o texto novo entre aspas: é o único
 # jeito que trata a barra invertida igual do bash 3.2 ao 5.3.
-gc_json_unescape() {
-  local s=$1 bs='\' q='"' sl='/' ph=$'\001' nl=$'\n' tab=$'\t' cr=$'\r'
+gc_json_unescape_to() {
+  local s=$2 bs='\' q='"' sl='/' ph=$'\001' nl=$'\n' tab=$'\t' cr=$'\r'
   s=${s//"$bs$bs"/"$ph"}
   s=${s//"$bs$q"/"$q"}
   s=${s//"$bs$sl"/"$sl"}
@@ -144,15 +147,20 @@ gc_json_unescape() {
   s=${s//"${bs}t"/"$tab"}
   s=${s//"${bs}r"/"$cr"}
   s=${s//"$ph"/"$bs"}
-  printf '%s\n' "$s"
+  printf -v "$1" '%s' "$s"
+}
+
+gc_json_unescape() { local gc__u; gc_json_unescape_to gc__u "$1"; printf '%s\n' "$gc__u"; }
+
+# Primeiro valor string da chave $3 no JSON $2, na variável $1 (código 1 se não houver).
+gc_json_field_to() {
+  local re='"'"$3"'"[[:space:]]*:[[:space:]]*"(([^"\\]|\\.)*)"'
+  [[ $2 =~ $re ]] || return 1
+  gc_json_unescape_to "$1" "${BASH_REMATCH[1]}"
 }
 
 # Primeiro valor string da chave no JSON (código 1 se não houver).
-gc_json_field() {
-  local re='"'"$2"'"[[:space:]]*:[[:space:]]*"(([^"\\]|\\.)*)"'
-  [[ $1 =~ $re ]] || return 1
-  gc_json_unescape "${BASH_REMATCH[1]}"
-}
+gc_json_field() { local gc__v; gc_json_field_to gc__v "$1" "$2" || return 1; printf '%s\n' "$gc__v"; }
 
 gc_json_escape() {
   local s=$1 bs='\' q='"' nl=$'\n' tab=$'\t' cr=$'\r'

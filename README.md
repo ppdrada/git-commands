@@ -46,7 +46,9 @@ Também dá para chamar direto: `/git-commands:novo-projeto`, `/git-commands:sal
 
 ## Verificação automática
 
-O plugin pode procurar novidades nos seus projetos sozinho, de tempos em tempos (o padrão é a cada 30 minutos). Ele usa o agendador do próprio sistema: Agendador de Tarefas no Windows, launchd no macOS e cron no Linux, então funciona mesmo com o Claude fechado. Ele só verifica, nunca atualiza nada sozinho. Quando você abrir o Claude, ele conta o que mudou.
+O plugin pode procurar novidades nos seus projetos sozinho, de tempos em tempos (o padrão é a cada 30 minutos). Ele usa o agendador do próprio sistema: Agendador de Tarefas no Windows, launchd no macOS e cron no Linux, então funciona mesmo com o Claude fechado. Ele só verifica, nunca atualiza nada sozinho. Quando você abrir o Claude, ele conta o que mudou, e avisa se a verificação deu erro ou parou de rodar.
+
+No macOS, guarde os projetos fora de Documentos, Mesa e Downloads (por exemplo, em `~/git`): o sistema não deixa tarefas em segundo plano lerem essas pastas.
 
 - Ligar: "quero que você verifique meus projetos a cada 30 minutos"
 - Mudar o intervalo: "verifica a cada 15 minutos"

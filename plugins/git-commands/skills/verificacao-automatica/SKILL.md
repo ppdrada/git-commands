@@ -1,6 +1,6 @@
 ---
 name: verificacao-automatica
-description: Use quando a pessoa quer que os projetos sejam verificados sozinhos de tempos em tempos, quer ligar, desligar ou mudar o intervalo da verificação automática de novidades do GitHub, ou quando outra skill do git-commands perguntar sobre isso, com frases como "verificar sozinho", "a cada 30 minutos", "desligar a verificação automática" ou "mudar o intervalo".
+description: Use quando a pessoa quer que os projetos sejam verificados sozinhos de tempos em tempos, quer ligar, desligar ou mudar o intervalo da verificação automática de novidades do GitHub, quando a verificação automática deu erro ou parou de rodar, ou quando outra skill do git-commands perguntar sobre isso, com frases como "verificar sozinho", "a cada 30 minutos", "desligar a verificação automática" ou "mudar o intervalo".
 ---
 
 # Verificação automática
@@ -24,6 +24,13 @@ Leia `${CLAUDE_PLUGIN_ROOT}/reference/regras.md` antes de qualquer passo.
 - Desligar: `git-commands schedule disable`.
 - Mudar o intervalo: `git-commands schedule enable <novo intervalo>`.
 - Ver como está: `git-commands schedule status`.
+
+## Quando ela deu erro ou parou
+
+O plugin avisa na abertura do Claude. Conforme o aviso, e sempre com o ok da pessoa:
+- "sem permissão para ler a pasta de projetos", no Mac: o macOS não deixa tarefas em segundo plano lerem Documentos, Mesa e Downloads. Ofereça mover a pasta de projetos para `~/git` (mover um projeto não estraga o git dele) e gravar a pasta nova com `git-commands config set projects_dir "<pasta>"`.
+- "a pasta de projetos não existe" ou "não está configurada": escolha a pasta de novo (skill `git-commands:configurar`).
+- "não roda há…": rode `git-commands schedule status`. Se disser `desligado`, ou `ligado` e mesmo assim parada, ligue de novo com `git-commands schedule enable <intervalo>`, que recria o agendamento. No Linux, se continuar parada, o serviço cron pode estar desligado (é comum no WSL): mostre `sudo service cron start` para a pessoa rodar.
 
 ## Se a pessoa não quiser
 

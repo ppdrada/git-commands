@@ -14,10 +14,41 @@ find "$(gc_home)/sessions" -mindepth 1 -maxdepth 1 -type d -mtime +2 -exec rm -r
 gc_cwd=$(gc_json_field "$gc_input" cwd) || gc_cwd=$PWD
 gc_cwd=$(gc_norm_path "$gc_cwd")
 
-# Com a verificação automática ligada: mantém a cópia do agendador em dia e conta as
-# novidades da última verificação (sem rede: o agendador é que fala com o GitHub).
+gc_numero() { case "$1" in ''|*[!0-9]*) return 1 ;; esac; }
+
+# Com a verificação automática ligada: mantém a cópia do agendador em dia, avisa se ela deu erro
+# ou parou, e conta as novidades da última verificação (sem rede: o agendador é que fala com o GitHub).
 if [ "$(gc_config_get auto_check)" = on ]; then
   gc_app_sync 2>/dev/null
+  gc_h=$(gc_home)
+  gc_ultima=$(tail -n 1 "$gc_h/check.log" 2>/dev/null)
+  case "$gc_ultima" in
+    *" erro "[0-9]*)
+      # A linha de antes é a mensagem de erro da varredura, quando há uma.
+      gc_motivo=$(tail -n 2 "$gc_h/check.log" | sed -n '1s/^git-commands: //p')
+      printf 'A verificação automática do git-commands deu erro na última vez que rodou (%s): %s. Na sua primeira resposta, avise a pessoa em uma frase e ofereça resolver (skill git-commands:verificacao-automatica).\n' \
+        "${gc_ultima% erro *}" "${gc_motivo:-código ${gc_ultima##* }}" 2>/dev/null
+      ;;
+    *)
+      # Parada: a última verificação tem mais de 3 intervalos. Só avisa se já estava assim numa
+      # abertura anterior, 3 intervalos atrás: logo depois de ligar ou acordar o computador,
+      # o agendador ainda não teve tempo de rodar.
+      gc_int=$(gc_config_get interval); gc_agora=$(date +%s); gc_quando=""; gc_vq=""; gc_vt=""
+      [ -f "$gc_h/status.time" ] && read -r gc_quando < "$gc_h/status.time"
+      if gc_numero "$gc_quando" && gc_numero "$gc_int" && [ $(( gc_agora - gc_quando )) -gt $(( gc_int * 180 )) ]; then
+        [ -f "$gc_h/status.stale" ] && read -r gc_vq gc_vt < "$gc_h/status.stale"
+        if [ "$gc_vq" != "$gc_quando" ] || ! gc_numero "$gc_vt"; then
+          printf '%s %s\n' "$gc_quando" "$gc_agora" > "$gc_h/status.stale"
+        elif [ $(( gc_agora - gc_vt )) -gt $(( gc_int * 180 )) ]; then
+          gc_idade=$(( gc_agora - gc_quando ))
+          if [ "$gc_idade" -lt 7200 ]; then gc_ha="$(( gc_idade / 60 )) minutos"
+          elif [ "$gc_idade" -lt 172800 ]; then gc_ha="$(( gc_idade / 3600 )) horas"
+          else gc_ha="$(( gc_idade / 86400 )) dias"; fi
+          printf 'A verificação automática do git-commands não roda há %s (o normal é a cada %s minutos). Na sua primeira resposta, avise a pessoa em uma frase e ofereça conferir (skill git-commands:verificacao-automatica).\n' "$gc_ha" "$gc_int" 2>/dev/null
+        fi
+      fi
+      ;;
+  esac
   if gc_novas=$(gc_updates_news); then
     gc_lista=$(printf '%s\n' "$gc_novas" | awk -F'\t' '{ printf "%s%s (%s)", (NR > 1 ? ", " : ""), $1, $2 }')
     {

@@ -32,6 +32,15 @@ test_scan_sem_pasta_configurada() {
   assert_contains "$err" "pasta de projetos" "explica o que falta"
 }
 
+test_scan_pasta_sem_permissao_vira_erro() {
+  [ "$(gc os)" = windows ] && skip "no Windows o chmod não tira a leitura"
+  [ "$(id -u)" = 0 ] && skip "o root lê qualquer pasta"
+  make_github_pair app >/dev/null; chmod 000 "$SANDBOX/projetos"
+  local err; err=$(gc updates scan --dir "$SANDBOX/projetos" 2>&1); local rc=$?
+  chmod 755 "$SANDBOX/projetos"
+  assert_eq "1" "$rc" "não pode dizer que deu certo"; assert_contains "$err" "sem permissão" ""
+}
+
 test_save_e_news() {
   gc config set projects_dir "$SANDBOX/projetos"; local a; a=$(make_github_pair atras); push_remote_commit atras n.txt "um"
   gc updates scan --save >/dev/null; assert_contains "$(gc updates news)" "atras	1	" ""

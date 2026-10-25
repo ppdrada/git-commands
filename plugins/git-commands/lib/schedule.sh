@@ -140,6 +140,8 @@ gc_sched_enable() {
     mac) gc_sched_mac_enable "$min" ;;
     *) gc_sched_linux_enable "$min" ;;
   esac || return 1
+  # A contagem do aviso de verificação parada (hook session-start) começa agora.
+  date +%s > "$(gc_home)/status.time"
   gc_config_set auto_check on
   gc_config_set interval "$min"
   gc_config_set auto_check_asked yes

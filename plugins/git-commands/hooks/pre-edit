@@ -3,27 +3,35 @@
 # GitHub em cada sessão, confere se há novidades no GitHub. Se houver, segura a edição e pede
 # para o Claude perguntar à pessoa antes. Não age em subagentes (Caminho A) e não segura nada
 # quando o GitHub não responde.
+# Da segunda edição em diante, sai sem abrir nenhum processo além do cat: no Windows cada
+# processo novo custa caro, e o Claude edita muito.
 PATH="/usr/bin:/bin:/mingw64/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
 case "$0" in */*|*\\*) gc_hook_dir="${0%[/\\]*}" ;; *) gc_hook_dir=. ;; esac
-gc_hook_dir=$(cd "$gc_hook_dir" && pwd)
 . "$gc_hook_dir/../lib/common.sh"
 . "$gc_hook_dir/../lib/proactive.sh"
 
 gc_input=$(cat)
-gc_agent=$(gc_json_field "$gc_input" agent_id) && [ -n "$gc_agent" ] && exit 0
-gc_path=$(gc_json_field "$gc_input" file_path) || gc_path=$(gc_json_field "$gc_input" notebook_path) || exit 0
-gc_path=$(gc_norm_path "$gc_path")
-gc_proactive_applies "$gc_path" || exit 0
-gc_top=$(gc_toplevel "$gc_path") || exit 0
+gc_json_field_to gc_agent "$gc_input" agent_id && [ -n "$gc_agent" ] && exit 0
+gc_json_field_to gc_path "$gc_input" file_path || gc_json_field_to gc_path "$gc_input" notebook_path || exit 0
+gc_bs='\'; gc_path=${gc_path//"$gc_bs"//}
+case "$gc_path" in /*|[A-Za-z]:*) ;; *) gc_path="$PWD/$gc_path" ;; esac
 
-# Uma checagem por projeto em cada sessão.
-gc_sess=$(gc_json_field "$gc_input" session_id) || gc_sess=""
-gc_sess=$(printf '%s' "$gc_sess" | tr -cd 'A-Za-z0-9_-')
-[ -n "$gc_sess" ] || gc_sess=sem-sessao
-gc_mark_dir="$(gc_home)/sessions/$gc_sess"
-gc_mark="$gc_mark_dir/$(printf '%s' "$gc_top" | cksum | cut -d' ' -f1)"
+# Uma checagem por projeto em cada sessão. O projeto é a pasta mais próxima com .git.
+gc_proj=${gc_path%/*}
+while [ -n "$gc_proj" ] && [ ! -e "$gc_proj/.git" ]; do
+  case "$gc_proj" in */*) gc_proj=${gc_proj%/*} ;; *) gc_proj="" ;; esac
+done
+[ -n "$gc_proj" ] || exit 0
+gc_json_field_to gc_sess "$gc_input" session_id || gc_sess=""
+gc_sess=${gc_sess//[![:alnum:]_-]/}
+gc_mark_dir="${GIT_COMMANDS_HOME:-$HOME/.git-commands}/sessions/${gc_sess:-sem-sessao}"
+gc_mark="$gc_mark_dir/${gc_proj//[![:alnum:]_-]/_}"
 [ -e "$gc_mark" ] && exit 0
 mkdir -p "$gc_mark_dir" && : > "$gc_mark"
+
+# Primeira edição deste projeto na sessão: agora sim, as checagens com o git.
+gc_top=$(gc_toplevel "$gc_path") || exit 0
+gc_proactive_applies "$gc_top" || exit 0
 
 gc_quiet_net
 gc_run_with_timeout 8 git -C "$gc_top" fetch --quiet >/dev/null 2>&1 || exit 0
