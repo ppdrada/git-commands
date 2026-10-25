@@ -30,7 +30,7 @@ Sempre que abrir, juntar ou citar um PR, mande o link: `gh pr view <número> --j
 
 - Antes de um comando que pode apagar trabalho (descartar alterações, forçar envio, rebase, apagar branch, apagar stash, apagar repositório): explique o que vai se perder e pergunte. Avise que o Claude Code também vai pedir confirmação.
 - Nunca use `git pull --rebase` nem `git push --force`.
-- Antes de commit e de push, rode `git-commands secrets`. Para cada arquivo listado, pergunte se é para enviar mesmo e ofereça colocá-lo no `.gitignore`.
+- Antes do commit, rode `git-commands secrets`. Antes do push, rode `git-commands secrets --push`, que olha o que vai mesmo para o GitHub, inclusive commits já feitos. Para cada arquivo listado, pergunte se é para enviar mesmo e ofereça colocá-lo no `.gitignore`. Se o arquivo já estiver no git, o `.gitignore` sozinho não basta: rode também `git rm --cached <arquivo>` (tira do git sem apagar do computador).
 
 ## 5. Fale simples
 
@@ -39,3 +39,7 @@ Português simples, ou o idioma em que a pessoa escrever. Mostre o nome do coman
 ## 6. Só na conversa com a pessoa
 
 Estas regras valem quando você conversa com a pessoa. Ajudantes e automações (subagentes, planos que fazem commit sozinhos) seguem sem interrupção. A regra da seção 4 sobre comandos que apagam trabalho vale para todos: o Claude Code pede confirmação, venha o comando de onde vier.
+
+## 7. gh fora do PATH
+
+O `gh` pode não aparecer pelo nome numa sessão aberta de um terminal que já existia antes de ele ser instalado. Se um comando `gh` der "command not found", rode `git-commands doctor`. Quando o doctor mostrar `gh_on_path=no` e um caminho em `gh_path`, o gh está instalado: rode de novo o comando que falhou com esse caminho entre aspas no lugar de `gh` (por exemplo, `"<gh_path>" pr create …`) e use o caminho em todos os comandos `gh` até o fim da sessão. Não peça para a pessoa reinstalar o gh nem reabrir o Claude por isso. Se o doctor não achar o gh, use a skill `git-commands:configurar`.

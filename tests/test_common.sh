@@ -41,6 +41,15 @@ test_json_field_e_escape() {
 
 test_norm_path_windows() { . "$PLUGIN/lib/common.sh"; assert_eq "C:/Users/Nome Sobrenome/a.txt" "$(gc_norm_path 'C:\Users\Nome Sobrenome\a.txt')" ""; }
 
+test_quiet_net_nao_chama_programa_de_senha() {
+  . "$PLUGIN/lib/common.sh"
+  local logger="$SANDBOX/askpass.sh"
+  printf '%s\n' '#!/usr/bin/env bash' "echo chamado >> \"$SANDBOX/askpass.log\"" 'echo segredo' > "$logger"; chmod +x "$logger"
+  ( export SSH_ASKPASS="$logger" GIT_ASKPASS="$logger" DISPLAY=:0; gc_quiet_net
+    printf 'protocol=https\nhost=example.invalid\n\n' | git -c credential.helper= credential fill >/dev/null 2>&1 )
+  [ -e "$SANDBOX/askpass.log" ] && fail "o git chamou o programa que abre a janela de senha"; true
+}
+
 test_timeout() {
   . "$PLUGIN/lib/common.sh"
   gc_run_with_timeout 1 sleep 5; assert_eq "124" "$?" "estourou"
@@ -48,6 +57,8 @@ test_timeout() {
 }
 
 test_toplevel_sobe_ate_pasta_existente() {
-  . "$PLUGIN/lib/common.sh"; local r; r=$(make_local_repo l)
-  assert_eq "$(cd "$r" && pwd)" "$(cd "$(gc_toplevel "$r/nao/existe/a.txt")" && pwd)" ""
+  . "$PLUGIN/lib/common.sh"; local r t; r=$(make_local_repo l); : > "$r/.marca"
+  t=$(gc_toplevel "$r/nao/existe/a.txt") || fail "não achou o topo"
+  # Pela marca, e não pelo texto: o mesmo lugar tem nomes diferentes (/private/var no Mac, RUNNER~1 no Windows).
+  assert_file "$t/.marca" "o topo veio como $t"
 }

@@ -47,7 +47,7 @@ git config --global user.email "<e-mail>"
 
 ## 5. Pasta de projetos (`projects_dir` vazio)
 
-Pergunte onde a pessoa quer guardar os projetos. Sugira `~/Documents/git` se `~/Documents` existir, senão `~/git`. Crie a pasta e grave: `git-commands config set projects_dir "<pasta>"`.
+Pergunte onde a pessoa quer guardar os projetos. No Windows e no Linux, sugira `~/Documents/git` se `~/Documents` existir, senão `~/git`. No Mac, sugira `~/git`: o macOS costuma bloquear a pasta Documentos para tarefas em segundo plano, e a verificação automática não conseguiria ler os projetos. Crie a pasta e grave: `git-commands config set projects_dir "<pasta>"`.
 
 ## Ligar e desligar o git-commands
 

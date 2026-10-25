@@ -1,6 +1,6 @@
 # Testes do hook session-start (contexto na abertura do Claude).
 
-ss() { printf '{"cwd":"%s","source":"startup"}' "$1" | CLAUDE_PLUGIN_ROOT="$PLUGIN" bash "$PLUGIN/hooks/run-hook.cmd" session-start; }
+ss() { printf '{"cwd":"%s","source":"startup"}' "$1" | CLAUDE_PLUGIN_ROOT="$PLUGIN" "$BASH" "$PLUGIN/hooks/run-hook.cmd" session-start; }
 
 test_ss_fora_de_repo_silencioso() { local out; out=$(ss "$SANDBOX"); assert_eq "0" "$?" "o hook rodou"; assert_eq "" "$out" ""; }
 
@@ -33,6 +33,25 @@ test_ss_rapido_e_sem_rede() {
   local t0; t0=$(date +%s); ss "$SANDBOX/projetos/r1" >/dev/null
   [ $(( $(date +%s) - t0 )) -le 5 ] || fail "session-start demorou mais de 5s"
   assert_eq "" "$(find "$SANDBOX"/projetos/r*/.git/FETCH_HEAD -newer "$SANDBOX/ref")" "o hook não fez fetch"
+}
+
+test_ss_avisa_verificacao_parada() {
+  gc config set auto_check on; gc config set interval 30
+  local h t visto; h=$(gc home); t=$(( $(date +%s) - 3 * 3600 )); echo "$t" > "$h/status.time"
+  assert_not_contains "$(ss "$SANDBOX")" "não roda há" "na primeira vez, o computador pode ter acabado de acordar"
+  read -r visto _ < "$h/status.stale"; assert_eq "$t" "$visto" "guardou que viu a verificação velha"
+  echo "$t $(( $(date +%s) - 2 * 3600 ))" > "$h/status.stale"   # como se a primeira vez tivesse sido há 2 horas
+  assert_contains "$(ss "$SANDBOX")" "não roda há 3 horas" "3 h sem verificar, e já era assim 2 h atrás"
+  date +%s > "$h/status.time"
+  assert_not_contains "$(ss "$SANDBOX")" "não roda há" "verificação em dia"
+}
+
+test_ss_avisa_erro_da_verificacao() {
+  gc config set auto_check on; local h out; h=$(gc home)
+  printf '%s\n' 'git-commands: sem permissão para ler a pasta de projetos: /x/Documents/git' '2026-10-25 18:00:00 erro 1' > "$h/check.log"
+  out=$(ss "$SANDBOX"); assert_contains "$out" "deu erro" ""; assert_contains "$out" "sem permissão para ler a pasta de projetos" "mostra o motivo"
+  echo '2026-10-25 18:30:00 verificação ok' >> "$h/check.log"
+  assert_not_contains "$(ss "$SANDBOX")" "deu erro" "a última deu certo"
 }
 
 test_ss_apaga_marcadores_de_sessao_antigos() {

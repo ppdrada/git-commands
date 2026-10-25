@@ -77,6 +77,8 @@ gc_updates_scan() {
   [ -n "$dir" ] || dir=$(gc_config_get projects_dir)
   [ -n "$dir" ] || { printf 'git-commands: a pasta de projetos não está configurada (use a skill configurar ou --dir <pasta>)\n' >&2; return 1; }
   [ -d "$dir" ] || { printf 'git-commands: a pasta de projetos não existe: %s\n' "$dir" >&2; return 1; }
+  # No macOS, tarefas em segundo plano podem ser proibidas de ler pastas como Documentos.
+  ls "$dir" >/dev/null 2>&1 || { printf 'git-commands: sem permissão para ler a pasta de projetos: %s\n' "$dir" >&2; return 1; }
   out=$(gc_updates_repos "$dir" | while IFS= read -r r; do gc_updates_line "$r" "$fetch"; done)
   [ -z "$out" ] || printf '%s\n' "$out"
   if [ "$save" = yes ]; then
@@ -92,7 +94,7 @@ gc_updates_news() {
   local f out; f="$(gc_home)/status.tsv"
   [ -f "$f" ] || return 1
   out=$(while IFS=$'\t' read -r r name branch ahead behind dirty state; do
-    case "$state" in novidades|divergiu) ;; *) continue ;; esac
+    [ "$state" = novidades ] || [ "$state" = divergiu ] || continue
     [ -d "$r" ] || continue
     behind=$(git -C "$r" rev-list --count 'HEAD..@{u}' 2>/dev/null) || continue
     [ "${behind:-0}" -gt 0 ] && printf '%s\t%s\t%s\t%s\n' "$name" "$behind" "$r" "$state"
