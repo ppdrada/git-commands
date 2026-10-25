@@ -70,6 +70,20 @@ push_remote_commit() {
   git -C "$outro" push -q 2>/dev/null
 }
 
+# gh falso em $SANDBOX/stub/gh, com a mesma saída do gh real nos comandos que o plugin usa.
+# auth status sai com $STUB_GH_AUTH (0 = logado).
+make_gh_stub() {
+  mkdir -p "$SANDBOX/stub"
+  printf '%s\n' '#!/usr/bin/env bash' \
+    'case "$1 $2" in' \
+    '  "--version "*) printf "gh version 2.62.0 (2024-11-14)\nhttps://github.com/cli/cli/releases/tag/v2.62.0\n" ;;' \
+    '  "auth status") exit "${STUB_GH_AUTH:-0}" ;;' \
+    '  "api user") echo tester ;;' \
+    '  *) exit 1 ;;' \
+    'esac' > "$SANDBOX/stub/gh"
+  chmod +x "$SANDBOX/stub/gh"
+}
+
 # Repositório sem remote, com um commit. Imprime o caminho.
 make_local_repo() {
   local r="$SANDBOX/projetos/$1"
