@@ -14,4 +14,11 @@ test_ss_repo_github_injeta_regras() {
 
 test_ss_respeita_desligado() { local r out; r=$(make_github_pair app); gc proactive off "$r"; out=$(ss "$r"); assert_eq "0" "$?" "o hook rodou"; assert_eq "" "$out" ""; }
 
+test_ss_apaga_marcadores_de_sessao_antigos() {
+  local s; s="$(gc home)/sessions"; mkdir -p "$s/velha" "$s/nova"
+  touch -t 202001010000 "$s/velha"
+  ss "$SANDBOX" >/dev/null
+  [ -e "$s/velha" ] && fail "marcador antigo ficou"; assert_file "$s/nova" "marcador recente fica"
+}
+
 test_ss_cwd_com_barras_invertidas() { local r; r=$(make_github_pair app); [ "$(gc os)" = windows ] || skip "só no Windows"; assert_contains "$(ss "$(native_path "$r" | sed 's#/#\\\\#g')")" "(app)" ""; }

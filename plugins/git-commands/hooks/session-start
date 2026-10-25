@@ -7,6 +7,10 @@ gc_hook_dir=$(cd "$gc_hook_dir" && pwd)
 for gc_lib in "$gc_hook_dir"/../lib/*.sh; do . "$gc_lib"; done
 
 gc_input=$(cat)
+
+# Marcadores do hook pre-edit com mais de 2 dias não servem mais.
+find "$(gc_home)/sessions" -mindepth 1 -maxdepth 1 -type d -mtime +2 -exec rm -rf {} + 2>/dev/null
+
 gc_cwd=$(gc_json_field "$gc_input" cwd) || gc_cwd=$PWD
 gc_cwd=$(gc_norm_path "$gc_cwd")
 
