@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Executado pelo agendador do sistema (Agendador de Tarefas, launchd ou cron) a cada N minutos.
+# Só verifica novidades e grava o resultado para o aviso na abertura do Claude; nunca atualiza.
+PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/mingw64/bin:$PATH"
+export PATH
+case "$0" in */*|*\\*) gc_dir="${0%[/\\]*}" ;; *) gc_dir=. ;; esac
+gc_app=$(cd "$gc_dir/.." && pwd)
+. "$gc_app/lib/common.sh"
+gc_quiet_net
+
+gc_log="$(gc_home)/check.log"
+bash "$gc_app/bin/git-commands" updates scan --save >/dev/null 2>>"$gc_log"
+gc_rc=$?
+if [ "$gc_rc" -eq 0 ]; then gc_msg="verificação ok"; else gc_msg="erro $gc_rc"; fi
+printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$gc_msg" >> "$gc_log"
+tail -n 500 "$gc_log" > "$gc_log.tmp.$$" && mv -f "$gc_log.tmp.$$" "$gc_log"
+exit 0

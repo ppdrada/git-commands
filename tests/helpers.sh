@@ -84,6 +84,23 @@ make_gh_stub() {
   chmod +x "$SANDBOX/stub/gh"
 }
 
+# crontab falso em $SANDBOX/stub/crontab, que guarda o conteúdo em $SANDBOX/crontab.txt e entra
+# na frente do PATH. Começa com o conteúdo do primeiro argumento.
+make_crontab_stub() {
+  mkdir -p "$SANDBOX/stub"
+  printf '%s\n' "$1" > "$SANDBOX/crontab.txt"
+  printf '%s\n' '#!/usr/bin/env bash' \
+    "f=\"$SANDBOX/crontab.txt\"" \
+    'case "${1:-}" in' \
+    '  -l) [ -s "$f" ] || exit 1; cat "$f" ;;' \
+    '  -) cat > "$f" ;;' \
+    '  -r) : > "$f" ;;' \
+    '  *) exit 1 ;;' \
+    'esac' > "$SANDBOX/stub/crontab"
+  chmod +x "$SANDBOX/stub/crontab"
+  export PATH="$SANDBOX/stub:$PATH"
+}
+
 # Repositório sem remote, com um commit. Imprime o caminho.
 make_local_repo() {
   local r="$SANDBOX/projetos/$1"
