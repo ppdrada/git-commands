@@ -561,6 +561,7 @@ test_ss_cwd_com_barras_invertidas() { local r; r=$(make_github_pair app); [ "$(g
     - clone [conceito: clone] com `gh repo clone <dono/nome>` para dentro da pasta de projetos;
     - `git remote -v` [conceito: remote];
     - "o que é X?": explicar pelo glossário, mesmo que já tenha sido explicado.
+- [ ] **Step 3b: Ajustes do teste da Parte 1** — aplicar os 3 ajustes da seção "Ajustes do teste da Parte 1", no fim deste plano (skill `configurar` e `regras.md`), com teste de cenário antes e depois.
 - [ ] **Step 4: Verificar** — `bash tests/run.sh concepts` e `claude plugin validate plugins/git-commands --strict`.
 - [ ] **Step 5: Commit** — `git commit -m "Adiciona as skills salvar, branch-e-pr e comandos"`.
 
@@ -943,3 +944,13 @@ Expected: `git-commands schedule status` → `ligado 30`; `Get-ScheduledTask -Ta
 - [ ] **Step 2: O Dev, numa sessão nova, publica a Parte 4 com o plugin** (PR, link e merge), com o CI verde nos três sistemas.
 - [ ] **Step 3: Marcar a versão** — `git switch main && git pull --ff-only`, depois `claude plugin tag plugins/git-commands` e `git push origin --tags`. Expected: a tag `git-commands--v1.0.0` aparece em `gh release list` ou `git ls-remote --tags origin`.
 - [ ] **Step 4: Teste final de instalação limpa.** Num usuário ou máquina sem o plugin (ou depois de `claude plugin uninstall`), seguir o README do zero. Expected: instala e `/git-commands:novo-projeto` aparece.
+
+---
+
+## Ajustes do teste da Parte 1 (Task 7)
+
+Anotados depois de o Dev publicar a Parte 1 usando o próprio plugin. Entram na Task 10 (Step 3b).
+
+1. **Código do login.** O código do `gh auth login` não apareceu para o Dev no terminal. Funcionou o Claude rodar `gh auth login --web --hostname github.com --git-protocol https` em segundo plano e mostrar o código (o gh também copia o código para a área de transferência). A skill `configurar` passa a oferecer esse caminho primeiro, e o terminal fica como alternativa.
+2. **gh recém-instalado.** Em vez de pedir para reabrir o Claude, usar o `gh_path` do `doctor` (caminho completo) até o fim da sessão.
+3. **Respostas curtas ambíguas.** Com várias perguntas abertas, um "Sim" sozinho ficou ambíguo. Regra nova em `regras.md`: numerar as perguntas e, quando a resposta não disser a qual pergunta se refere, repetir em uma linha o que entendeu antes de agir.
