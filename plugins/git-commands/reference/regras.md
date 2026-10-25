@@ -39,3 +39,7 @@ Português simples, ou o idioma em que a pessoa escrever. Mostre o nome do coman
 ## 6. Só na conversa com a pessoa
 
 Estas regras valem quando você conversa com a pessoa. Ajudantes e automações (subagentes, planos que fazem commit sozinhos) seguem sem interrupção. A regra da seção 4 sobre comandos que apagam trabalho vale para todos: o Claude Code pede confirmação, venha o comando de onde vier.
+
+## 7. gh fora do PATH
+
+O `gh` pode não aparecer pelo nome numa sessão aberta de um terminal que já existia antes de ele ser instalado. Se um comando `gh` der "command not found", rode `git-commands doctor`. Quando o doctor mostrar `gh_on_path=no` e um caminho em `gh_path`, o gh está instalado: rode de novo o comando que falhou com esse caminho entre aspas no lugar de `gh` (por exemplo, `"<gh_path>" pr create …`) e use o caminho em todos os comandos `gh` até o fim da sessão. Não peça para a pessoa reinstalar o gh nem reabrir o Claude por isso. Se o doctor não achar o gh, use a skill `git-commands:configurar`.
