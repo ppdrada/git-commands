@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Hook PreToolUse (Bash e PowerShell): antes de um comando que pode apagar trabalho,
+# faz o Claude Code pedir confirmação, venha o comando de onde vier.
+PATH="/usr/bin:/bin:/mingw64/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
+case "$0" in */*|*\\*) gc_hook_dir="${0%[/\\]*}" ;; *) gc_hook_dir=. ;; esac
+gc_hook_dir=$(cd "$gc_hook_dir" && pwd)
+. "$gc_hook_dir/../lib/common.sh"
+. "$gc_hook_dir/../lib/guard.sh"
+
+gc_input=$(cat)
+gc_cmd=$(gc_json_field "$gc_input" command) || exit 0
+gc_motivo=$(gc_guard_reason "$gc_cmd") || exit 0
+gc_razao="git-commands: este comando pode apagar trabalho ($gc_motivo). Só confirme se você pediu isso."
+printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"%s"}}\n' "$(gc_json_escape "$gc_razao")"
+exit 0
