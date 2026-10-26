@@ -83,7 +83,7 @@ async function atualizar($: EngineInterface): Promise<void> {
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: PAINEL, description: 'Mostra o estado dos seus projetos do GitHub (git-commands)' })
+    await $.command.register({ name: 'painel', description: 'Mostra o estado dos seus projetos do GitHub (git-commands)' })
     await atualizar($)
     $.clock.every(MINUTO, () => {
       void atualizar($)
@@ -120,7 +120,7 @@ export const register: Register = on => {
     )
   })
 
-  on('command.run', { command: PAINEL }, async $ => {
+  on('command.run', { command: 'painel' }, async $ => {
     await atualizar($)
     const aberto = await $.ui.open({ id: PAINEL, title: 'git-commands' })
     return aberto.isPlaced ? {} : { text: 'Não deu para abrir o painel aqui.' }
