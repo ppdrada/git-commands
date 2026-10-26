@@ -13,7 +13,7 @@ done
 
 gc_usage() {
   printf 'uso: git-commands <subcomando> [argumentos]\n' >&2
-  printf 'subcomandos: home, os, config, learned, doctor, secrets, guard, proactive, updates, schedule\n' >&2
+  printf 'subcomandos: home, os, config, learned, doctor, secrets, guard, proactive, updates, schedule, ssh\n' >&2
 }
 
 gc_sub="${1:-}"

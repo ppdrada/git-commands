@@ -80,6 +80,8 @@ make_gh_stub() {
     '  "auth status") [ -n "${STUB_GH_OFFLINE:-}" ] && echo "error connecting to api.github.com" >&2; exit "${STUB_GH_AUTH:-0}" ;;' \
     '  "auth token") [ -n "${STUB_GH_OFFLINE:-}" ] && { echo gho_teste; exit 0; }; exit "${STUB_GH_AUTH:-0}" ;;' \
     '  "config get") echo "${STUB_GH_PROTOCOL:-https}" ;;' \
+    '  "config set") exit 0 ;;' \
+    '  "api meta") printf "%s\n" "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=" ;;' \
     '  "api user") echo tester ;;' \
     '  *) exit 1 ;;' \
     'esac' > "$SANDBOX/stub/gh"
