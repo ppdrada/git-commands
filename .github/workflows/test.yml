@@ -52,7 +52,27 @@ jobs:
       - name: Instala o Claude Code
         run: npm install -g @anthropic-ai/claude-code
 
-      - name: Valida o marketplace e o plugin
+      - name: Valida o marketplace e os plugins
         run: |
           claude plugin validate . --strict
           claude plugin validate plugins/git-commands --strict
+          claude plugin validate plugins/git-commands-painel --strict
+
+  painel:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Instala o Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Testes do painel
+        run: claude plugin test plugins/git-commands-painel

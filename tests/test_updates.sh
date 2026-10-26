@@ -117,3 +117,22 @@ test_pull_head_destacado_conta_commits_soltos() {
   printf 'x\n' > "$a/solto.txt"; git -C "$a" add solto.txt; git -C "$a" commit -qm solto
   assert_contains "$(gc updates pull "$a")" "1 commit(s) soltos" "um commit fora de qualquer branch"
 }
+
+test_pull_atualiza_a_linha_salva() {
+  gc config set projects_dir "$SANDBOX/projetos"
+  make_github_pair emdia >/dev/null
+  local a; a=$(make_github_pair atras); push_remote_commit atras n.txt "um"
+  gc updates scan --save >/dev/null
+  local h="$HOME/.git-commands"; echo 1000 > "$h/status.time"
+  assert_contains "$(grep '	atras	' "$h/status.tsv")" "	novidades" "antes de atualizar"
+  local outro; outro=$(grep '	emdia	' "$h/status.tsv")
+  gc updates pull "$a" >/dev/null
+  assert_contains "$(grep '	atras	' "$h/status.tsv")" "	0	0	0	em-dia" "depois de atualizar"
+  assert_eq "$outro" "$(grep '	emdia	' "$h/status.tsv")" "o outro projeto não muda"
+  assert_eq "2" "$(grep -c . "$h/status.tsv")" "nenhuma linha some nem se repete"
+  assert_eq "1000" "$(cat "$h/status.time")" "o status.time continua o da última verificação"
+  # Já atualizado por fora (o arquivo ficou velho): o pull diz que está em dia e acerta a linha.
+  sed 's/	0	0	0	em-dia$/	0	1	0	novidades/' "$h/status.tsv" > "$h/velho" && mv "$h/velho" "$h/status.tsv"
+  assert_contains "$(gc updates pull "$a")" "já estava em dia" ""
+  assert_contains "$(grep '	atras	' "$h/status.tsv")" "	0	0	0	em-dia" "linha velha acertada"
+}
