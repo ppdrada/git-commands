@@ -23,11 +23,13 @@ native_path() {
   if (cd "$1" && pwd -W) >/dev/null 2>&1; then (cd "$1" && pwd -W); else (cd "$1" && pwd); fi
 }
 
-# Sandbox novo por teste: HOME, gitconfig global e pastas próprios.
+# Sandbox novo por teste: HOME, gitconfig global e pastas próprios. A pasta de configuração do gh (GH_CONFIG_DIR) também
+# fica no sandbox: no Windows o gh guarda o login fora do HOME (em %APPDATA%), e um teste que chamasse o gh da máquina leria ou
+# gravaria o login de verdade.
 gc_sandbox() {
   SANDBOX="$(mktemp -d "${GC_TEST_TMP:-${TMPDIR:-/tmp}}/sandbox.XXXXXX")"
   export SANDBOX
-  export HOME="$SANDBOX/home"
+  export HOME="$SANDBOX/home" GH_CONFIG_DIR="$SANDBOX/gh"
   mkdir -p "$HOME" "$SANDBOX/projetos" "$SANDBOX/remotes"
   unset GIT_COMMANDS_HOME GIT_COMMANDS_OS GIT_COMMANDS_GH GIT_COMMANDS_GH_DIRS GIT_COMMANDS_SCHEDULE_DRY_RUN
   export GIT_CONFIG_GLOBAL="$SANDBOX/gitconfig"

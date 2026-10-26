@@ -37,6 +37,7 @@ test_schedule_enable_recomeca_a_contagem() {
 }
 
 test_run_scheduled_grava_status_e_log() {
+  export GIT_COMMANDS_GH=/nao/existe   # a verificação agendada pede o login ao gh: o da máquina nunca entra
   gc config set projects_dir "$SANDBOX/projetos"; make_github_pair app >/dev/null; push_remote_commit app n.txt "um"
   make_crontab_stub ""; dr linux enable 30 >/dev/null; "$BASH" "$(gc home)/app/scheduler/run-scheduled"
   assert_contains "$(cat "$(gc home)/status.tsv")" "novidades" ""; assert_contains "$(cat "$(gc home)/check.log")" "verificação ok" ""

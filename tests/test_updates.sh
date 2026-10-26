@@ -94,6 +94,7 @@ test_scan_pasta_sem_permissao_vira_erro() {
 }
 
 test_save_e_news() {
+  export GIT_COMMANDS_GH=/nao/existe   # o scan sem --dir pede o login ao gh: o da máquina nunca entra
   gc config set projects_dir "$SANDBOX/projetos"; local a; a=$(make_github_pair atras); push_remote_commit atras n.txt "um"
   gc updates scan --save >/dev/null; assert_contains "$(gc updates news)" "atras	1	" ""
   gc updates pull "$a" >/dev/null; assert_exit 1 gc updates news
@@ -171,6 +172,7 @@ test_pull_head_destacado_conta_commits_soltos() {
 }
 
 test_pull_atualiza_a_linha_salva() {
+  export GIT_COMMANDS_GH=/nao/existe   # o scan sem --dir pede o login ao gh: o da máquina nunca entra
   gc config set projects_dir "$SANDBOX/projetos"
   make_github_pair emdia >/dev/null
   local a; a=$(make_github_pair atras); push_remote_commit atras n.txt "um"
