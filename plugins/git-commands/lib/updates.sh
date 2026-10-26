@@ -25,10 +25,13 @@ gc_updates_fetch() {
 }
 
 # Uma linha: caminho, nome, branch, ahead, behind, alterados, estado.
+# O status roda com o core.fsmonitor vazio: um repositório achado pela busca pode trazer um core.fsmonitor que roda um
+# programa. Vazio, e não false, porque antes do Git 2.36 o valor é o caminho de um programa, e false rodaria o programa
+# false; o vazio desliga nas duas versões.
 gc_updates_line() {
   local r=$1 fetch=$2 name branch ahead=0 behind=0 dirty state="" counts
   name=${r##*/}
-  dirty=$(GIT_OPTIONAL_LOCKS=0 git -C "$r" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+  dirty=$(GIT_OPTIONAL_LOCKS=0 git -C "$r" -c core.fsmonitor= status --porcelain 2>/dev/null | wc -l | tr -d ' ')
   branch=$(git -C "$r" symbolic-ref --short -q HEAD 2>/dev/null) || branch=""
   if ! git -C "$r" rev-parse -q --verify HEAD >/dev/null 2>&1; then
     state=sem-commits

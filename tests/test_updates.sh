@@ -127,6 +127,22 @@ test_scan_nao_mexe_no_index() {
   assert_eq "$antes" "$(cksum < "$a/.git/index")" "a varredura reescreveu o index (pode pegar o index.lock da pessoa)"
 }
 
+test_scan_nao_roda_o_fsmonitor_do_projeto() {
+  local r="$SANDBOX/projetos/app" marca="$SANDBOX/fsmonitor-rodou" programa="$SANDBOX/fsmonitor.sh"
+  make_repo_at "$r" teste >/dev/null
+  # Um repositório achado pela busca pode trazer um core.fsmonitor que roda um programa. Aqui o programa só deixa um marcador.
+  printf '%s\n' '#!/bin/sh' ": > \"$marca\"" > "$programa"; chmod +x "$programa"
+  git -C "$r" config core.fsmonitor "$programa"
+  # O git só consulta o programa quando o index tem a extensão do fsmonitor: um git status comum a grava, e o marcador mostra
+  # que este git roda mesmo o programa.
+  git -C "$r" status >/dev/null 2>&1
+  assert_file "$marca" "um git status comum roda o programa do core.fsmonitor"
+  rm -f "$marca"
+  gc updates scan --no-fetch --repo "$r" >/dev/null
+  [ -e "$marca" ] && fail "a verificação rodou o programa do core.fsmonitor do projeto"
+  return 0
+}
+
 test_scan_projeto_ssh_busca_por_https() {
   local a; a=$(make_github_pair app); git -C "$a" remote set-url origin git@github.com:teste/app.git
   push_remote_commit app n.txt "um"
