@@ -81,15 +81,20 @@ gc_ssh_test() {
 # Grava no known_hosts as chaves do servidor do GitHub, buscadas pela API do próprio GitHub
 # (por HTTPS e com login), para o SSH nunca aceitar o servidor no escuro.
 gc_ssh_known_hosts() {
-  local gh chaves k kh="$HOME/.ssh/known_hosts" n=0
+  local gh chaves k kh="$HOME/.ssh/known_hosts" conhecidas="" n=0
   gh=$(gc_gh_bin)
   if [ -n "$gh" ]; then chaves=$(gc_run_with_timeout 15 "$gh" api meta --jq '.ssh_keys[]' 2>/dev/null); fi
   [ -n "$chaves" ] || { printf 'git-commands: não consegui buscar as chaves do servidor do GitHub\n' >&2; return 1; }
   mkdir -p "$HOME/.ssh" || return 1
   chmod 700 "$HOME/.ssh" 2>/dev/null
+  # As chaves do github.com que o arquivo já tem, em qualquer formato (tab, nome embaralhado):
+  # o ssh-keygen -F lê como o próprio ssh. Compara só a parte em base64 da chave.
+  [ -f "$kh" ] && conhecidas=$(ssh-keygen -F github.com -f "$kh" 2>/dev/null)
+  # Termina a última linha antes de acrescentar, para não grudar na entrada de outro servidor.
+  if [ -s "$kh" ] && [ -n "$(tail -c 1 "$kh")" ]; then printf '\n' >> "$kh" || return 1; fi
   local IFS=$'\n'
   for k in $chaves; do
-    [ -f "$kh" ] && grep -qF -- "$k" "$kh" && continue
+    case "$conhecidas" in *"${k#* }"*) continue ;; esac
     printf 'github.com %s\n' "$k" >> "$kh" || return 1
     n=$((n + 1))
   done

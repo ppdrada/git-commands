@@ -73,3 +73,16 @@ test_ssh_usa_o_ssh_do_git() {
   git config --global core.sshCommand "C:/Windows/System32/OpenSSH/ssh.exe"
   assert_eq "C:/Windows/System32/OpenSSH/ssh.exe" "$(gc_ssh_cmd)" ""
 }
+
+test_ssh_known_hosts_respeita_arquivo_escrito_a_mao() {
+  make_gh_stub; export GIT_COMMANDS_GH="$SANDBOX/stub/gh"; mkdir -p "$HOME/.ssh"; local kh="$HOME/.ssh/known_hosts"
+  local ed="AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
+  printf 'gitlab.com ssh-ed25519 AAAAoutrachave' > "$kh"   # sem quebra de linha no fim
+  gc ssh known-hosts >/dev/null
+  grep -qx 'gitlab.com ssh-ed25519 AAAAoutrachave' "$kh" || fail "estragou a linha do outro servidor: $(cat "$kh")"
+  grep -qx "github.com ssh-ed25519 $ed" "$kh" || fail "a linha do GitHub não ficou inteira"
+  printf 'github.com\tssh-ed25519\t%s\n' "$ed" > "$kh"     # separada por tab
+  gc ssh known-hosts >/dev/null; assert_eq "1" "$(grep -c "$ed" "$kh")" "duplicou a chave escrita com tab"
+  printf '[ssh.github.com]:443 ssh-ed25519 %s\n' "$ed" > "$kh"   # só a porta 443
+  gc ssh known-hosts >/dev/null; grep -qx "github.com ssh-ed25519 $ed" "$kh" || fail "a chave do github.com não entrou"
+}
