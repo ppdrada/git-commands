@@ -29,20 +29,24 @@ gc_sched_runner() { printf '%s\n' "$(gc_home)/app/scheduler/run-scheduled"; }
 # Texto pronto para ficar entre aspas simples no PowerShell (o apóstrofo vira dois).
 gc_sched_ps_quote() { local q="'" s=$1; s=${s//"$q"/"$q$q"}; printf '%s\n' "$s"; }
 
-# ---------- Windows: Agendador de Tarefas (scripts .ps1 só com ASCII) ----------
+# ---------- Windows: Agendador de Tarefas (.ps1 com BOM; o texto fixo, só ASCII) ----------
 
 gc_sched_windows_enable() {
   local min=$1 h ps1 bash_w runner_w
   h=$(gc_home); ps1="$h/schedule.ps1"
   bash_w=$(gc_sched_ps_quote "$(gc_sched_native "$(command -v bash)")")
   runner_w=$(gc_sched_ps_quote "$(gc_sched_native "$(gc_sched_runner)")")
-  printf '%s\r\n' \
-    '$ErrorActionPreference = "Stop"' \
-    "\$acao = New-ScheduledTaskAction -Execute 'conhost.exe' -Argument '--headless \"$bash_w\" -l \"$runner_w\"'" \
-    "\$gatilho = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes $min)" \
-    '$ajustes = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 10)' \
-    "Register-ScheduledTask -TaskName '$GC_SCHED_TASK' -Description 'git-commands: verifica novidades no GitHub (nunca atualiza nada)' -Action \$acao -Trigger \$gatilho -Settings \$ajustes -Force | Out-Null" \
-    > "$ps1"
+  # O BOM faz o PowerShell 5.1 ler o arquivo como UTF-8: sem ele, lê como ANSI e estraga um
+  # caminho com acento (C:\Users\João), e a tarefa aponta para uma pasta que não existe.
+  {
+    printf '\357\273\277'
+    printf '%s\r\n' \
+      '$ErrorActionPreference = "Stop"' \
+      "\$acao = New-ScheduledTaskAction -Execute 'conhost.exe' -Argument '--headless \"$bash_w\" -l \"$runner_w\"'" \
+      "\$gatilho = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes $min)" \
+      '$ajustes = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 10)' \
+      "Register-ScheduledTask -TaskName '$GC_SCHED_TASK' -Description 'git-commands: verifica novidades no GitHub (nunca atualiza nada)' -Action \$acao -Trigger \$gatilho -Settings \$ajustes -Force | Out-Null"
+  } > "$ps1"
   gc_sched_run powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(gc_sched_native "$ps1")" || return 1
   if gc_sched_dry; then : > "$h/dry-run-windows-task"; fi
   return 0

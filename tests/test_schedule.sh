@@ -72,3 +72,10 @@ test_schedule_nome_de_teste() {
   GIT_COMMANDS_SCHED_ID=teste dr windows enable 30 >/dev/null; local s; s=$(cat "$(gc home)/schedule.ps1")
   assert_contains "$s" "'git-commands-teste'" ""; assert_not_contains "$s" "git-commands-verificar" ""
 }
+
+test_schedule_windows_acentos() {
+  export HOME="$SANDBOX/home/João"; mkdir -p "$HOME"
+  dr windows enable 30 >/dev/null; local f; f="$(gc home)/schedule.ps1"
+  assert_eq "efbbbf" "$(head -c 3 "$f" | od -An -tx1 | tr -d ' \n')" "sem BOM, o PowerShell 5.1 lê o .ps1 como ANSI e estraga o caminho com acento"
+  assert_contains "$(cat "$f")" "João" ""
+}
