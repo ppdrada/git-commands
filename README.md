@@ -98,6 +98,7 @@ Fale com o Claude do seu jeito. Ele reconhece o que você quer e usa a skill cer
 | "vou começar a mexer na página de login" | pergunta se você quer uma branch e, no fim, abre o PR | `branch-e-pr` |
 | "tem algo novo nos meus projetos?" | mostra as novidades e pergunta o que fazer | `atualizar` |
 | "verifica meus projetos a cada 30 minutos" | liga a verificação automática | `verificacao-automatica` |
+| "quero usar chave SSH no GitHub" | cria e configura a chave com você, passo a passo | `chave-ssh` |
 | "o que é um commit?" | explica, mesmo que já tenha explicado antes | `comandos` |
 
 Também dá para chamar uma skill direto: `/git-commands:novo-projeto`, `/git-commands:salvar` e assim por diante.
@@ -197,6 +198,24 @@ git config git-commands.coauthor true    # os commits levam Co-Authored-By: Clau
 git config git-commands.coauthor false   # não levam
 ```
 
+### Chaves SSH (opcional)
+
+O padrão é o login pelo navegador (HTTPS), que já é seguro. Se você preferir uma chave SSH, diga "quero usar chave SSH no GitHub" e o Claude faz com você:
+
+1. **Você cria a chave, com senha, no seu terminal.** O Claude mostra o comando (`ssh-keygen -t ed25519`), mas a senha da chave é digitada só por você e nunca passa pelo chat. Se você já tem uma chave, ela é usada ou fica intocada: o plugin nunca cria uma chave por cima de outra.
+2. **A senha fica guardada no sistema**, para você digitar uma vez só: o Chaveiro no macOS; o agente de chaves do Windows (ligado uma vez, num PowerShell como administrador) e o do Linux.
+3. **O plugin confia no servidor certo:** as chaves do servidor do GitHub vêm da API do próprio GitHub, nunca "no escuro".
+4. **A chave é registrada na sua conta** (com a sua autorização no navegador) e testada.
+5. **Os projetos passam para SSH**, com o seu ok, um por um ou todos.
+
+```bash
+git-commands ssh status                  # chave, agente, configuração e projetos em HTTPS e em SSH
+git-commands ssh test                    # testa a chave com o GitHub
+git-commands ssh remote ~/git/site https # volta um projeto para HTTPS
+```
+
+A verificação automática continua buscando por HTTPS e nunca precisa da senha da chave.
+
 ## Comandos do git-commands
 
 As skills usam o executável `git-commands`, que o Claude Code coloca no terminal dele. Normalmente é o Claude quem roda esses comandos por você.
@@ -210,6 +229,7 @@ As skills usam o executável `git-commands`, que o Claude Code coloca no termina
 | `git-commands learned list\|has\|add\|forget\|reset` | os conceitos já explicados |
 | `git-commands updates scan\|news\|detail\|pull` | procura novidades, mostra as diferenças e atualiza com segurança |
 | `git-commands secrets [--staged\|--push]` | procura arquivos com cara de senha ou chave |
+| `git-commands ssh status\|test\|known-hosts\|config\|remote` | a chave SSH: estado, teste, servidor do GitHub, configuração e troca dos projetos |
 
 Exemplo de `git-commands doctor`:
 
@@ -228,6 +248,8 @@ projects_dir=C:/Users/voce/git
 auto_check=on
 interval=30
 proactive=on
+ssh_key=
+git_protocol=https
 ```
 
 ## Segurança
@@ -267,9 +289,15 @@ Peça "confere a verificação automática". Os casos mais comuns:
 </details>
 
 <details>
+<summary><b>"Permission denied (publickey)" ao enviar por SSH</b></summary>
+
+A chave não está guardada no agente, ou não foi registrada no GitHub. Peça "confere minha chave SSH": o Claude roda `git-commands ssh test` e mostra o que falta. Para voltar o projeto para HTTPS enquanto isso: `git-commands ssh remote <pasta> https`.
+</details>
+
+<details>
 <summary><b>Os hooks não rodam no Windows</b></summary>
 
-Os hooks usam o Git Bash do Git for Windows, instalado no lugar padrão (`C:\Program Files\Git`). Sem ele, o plugin continua funcionando quando você pede, mas sem as checagens automáticas.
+Os hooks usam o Git Bash do Git for Windows. O plugin procura o Git Bash na variável `CLAUDE_CODE_GIT_BASH_PATH` (a mesma que o Claude Code usa), nas pastas padrão (`C:\Program Files\Git`) e pelo `git` do PATH (instalações portáteis ou pelo Scoop). Sem ele, o plugin continua funcionando quando você pede, mas sem as checagens automáticas.
 </details>
 
 <details>
@@ -328,7 +356,7 @@ docs/superpowers/                o design e o plano de construção
 - **Testes:** `bash tests/run.sh`, ou `bash tests/run.sh <parte do nome>` para rodar só alguns.
 - **CI:** a cada envio, os testes rodam no GitHub em Windows, macOS (com o bash 3.2) e Linux, criando e removendo o agendamento de verdade nos três.
 - **Validação:** `claude plugin validate plugins/git-commands --strict`.
-- **Avaliações de comportamento** (o Claude pergunta antes de agir?): `claude plugin eval plugins/git-commands --scaffold --ablation none --allow-tools Bash Read`. Rodam no macOS e no Linux; no Windows, o Claude Code recusa, porque não consegue isolar os comandos do terminal.
+- **Avaliações de comportamento** (o Claude pergunta antes de agir?): `GIT_COMMANDS_HOME="$(mktemp -d)" claude plugin eval plugins/git-commands --scaffold --ablation none --allow-tools Bash Read` (a pasta de estado separada evita marcar conceitos como aprendidos no seu `~/.git-commands`). Rodam no macOS e no Linux; no Windows, o Claude Code recusa, porque não consegue isolar os comandos do terminal.
 
 ## Licença
 
