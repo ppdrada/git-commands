@@ -128,16 +128,18 @@ gc_github_ssh_to_https() {
 }
 
 # Busca o origin com limite de tempo (quem chama faz o gc_quiet_net antes). Um origin SSH do
-# GitHub é buscado pelo endereço HTTPS equivalente, com o login do gh: o segundo plano nunca
-# precisa da senha da chave SSH.
+# GitHub é buscado primeiro pelo endereço HTTPS equivalente, com o login do gh: assim o segundo
+# plano não precisa da senha da chave SSH. Se o HTTPS falhar (projeto privado sem o login do gh
+# no git), tenta pelo próprio SSH, sem perguntas, como na 1.0.0; estouro de tempo não tenta de novo.
 gc_fetch_origin() {
-  local url https
+  local url https rc
   url=$(git -C "$1" config --get remote.origin.url 2>/dev/null)
   if https=$(gc_github_ssh_to_https "$url"); then
-    gc_run_with_timeout "$2" git -C "$1" fetch --prune --quiet "$https" '+refs/heads/*:refs/remotes/origin/*'
-  else
-    gc_run_with_timeout "$2" git -C "$1" fetch --prune --quiet
+    gc_run_with_timeout "$2" git -C "$1" fetch --prune --quiet "$https" '+refs/heads/*:refs/remotes/origin/*' && return 0
+    rc=$?
+    [ "$rc" -eq 124 ] && return 124
   fi
+  gc_run_with_timeout "$2" git -C "$1" fetch --prune --quiet
 }
 
 # 0 se algum remote do repositório aponta (na configuração crua) para o GitHub.

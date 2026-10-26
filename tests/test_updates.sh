@@ -99,3 +99,14 @@ test_pull_head_destacado() {
   local out; out=$(gc updates pull "$a"); assert_eq "7" "$?" ""
   assert_contains "$out" "não está em nenhuma branch" ""
 }
+
+test_scan_projeto_ssh_volta_para_o_ssh_se_o_https_falha() {
+  local a bare; a=$(make_github_pair app); push_remote_commit app n.txt "um"
+  # Agora o "GitHub" só responde pelo SSH; o HTTPS falha, como num projeto privado sem o login do gh no git.
+  bare=$(native_path "$SANDBOX/remotes/app.git")
+  git config --global --unset "url.$bare.insteadOf"
+  git config --global "url.$bare.insteadOf" "git@github.com:teste/app.git"
+  git config --global "url.$(native_path "$SANDBOX")/nao-existe.git.insteadOf" "https://github.com/teste/app.git"
+  git -C "$a" remote set-url origin git@github.com:teste/app.git
+  assert_contains "$(gc updates scan --dir "$SANDBOX/projetos")" "novidades" "devia tentar pelo SSH quando o HTTPS falha"
+}
