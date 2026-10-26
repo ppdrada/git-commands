@@ -55,3 +55,12 @@ test_secrets_formatos_novos_de_chave() {
 test_secrets_ignorado_nao_conta() { local r; r=$(make_local_repo s); echo ".env" > "$r/.gitignore"; echo x > "$r/.env"; assert_exit 0 gc secrets "$r"; }
 
 test_secrets_env_ja_preparado_conta() { local r; r=$(make_local_repo s); echo x > "$r/.env"; git -C "$r" add .env; assert_contains "$(gc secrets "$r")" ".env	arquivo .env" "sem --staged também olha o que já foi preparado"; }
+
+test_secrets_push_branch_nova_olha_so_o_que_falta() {
+  local a; a=$(make_github_pair app)
+  printf '{}\n' > "$a/credentials.json"; git -C "$a" add credentials.json; git -C "$a" commit -qm cred; git -C "$a" push -q 2>/dev/null
+  git -C "$a" switch -q -c nova; printf 'x\n' > "$a/b.txt"; git -C "$a" add b.txt; git -C "$a" commit -qm b
+  assert_not_contains "$(gc secrets --push "$a")" "credentials.json" "já está no GitHub"
+  printf 'AKIAABCDEFGHIJKLMNOP\n' > "$a/c.txt"; git -C "$a" add c.txt; git -C "$a" commit -qm c
+  assert_contains "$(gc secrets --push "$a")" "c.txt" "commit que ainda não foi enviado"
+}
