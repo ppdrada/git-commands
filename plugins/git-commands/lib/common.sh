@@ -128,6 +128,12 @@ gc_github_owner() {
   printf '%s\n' "$dono"
 }
 
+# 0 se $1 tem forma de login do GitHub: letras, números, - e _ (as contas de empresa têm _), começando por letra ou número.
+gc_is_github_login() {
+  local re='^[A-Za-z0-9][A-Za-z0-9_-]*$'
+  [[ $1 =~ $re ]]
+}
+
 # Endereço HTTPS equivalente a um endereço SSH do GitHub (git@github.com:dono/repo,
 # ssh://git@github.com/dono/repo, ssh://git@ssh.github.com:443/dono/repo). Código 1 para o resto.
 gc_github_ssh_to_https() {

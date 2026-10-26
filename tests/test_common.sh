@@ -105,6 +105,18 @@ test_dono_do_endereco() {
   done
 }
 
+test_forma_de_login_do_github() {
+  . "$PLUGIN/lib/common.sh"; local u
+  # Letras, números, - e _ (as contas de empresa têm _), começando por letra ou número, em qualquer caixa.
+  for u in ppdrada PPDRADA Teste teste-dois a 7 a1-b2 monalisa_octo A_b-c; do
+    gc_is_github_login "$u" || fail "devia aceitar [$u]"
+  done
+  # Vazio, o corpo de um erro (uma ou várias linhas), duas linhas, espaço, ponto, barra, ! e começo com - ou _ não são login.
+  for u in "" "{" $'a\nb' $'{\n  "message": "Bad credentials",\n  "status": "401"\n}' "dois nomes" " a" "a.b" "a/b" "ppdrada!" "-x" "_x"; do
+    gc_is_github_login "$u" && fail "não devia aceitar [$u]"
+  done; return 0
+}
+
 test_caminho_real_da_pasta() {
   . "$PLUGIN/lib/common.sh"; local r out re='^[A-Za-z]:/'
   r=$(gc_real_dir "$SANDBOX/home"); assert_eq "0" "$?" "a pasta existe"

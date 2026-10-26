@@ -74,6 +74,30 @@ test_doctor_grava_o_login() {
   assert_eq "fulano" "$(gc config get github_user)" "o login gravado ficou"
 }
 
+test_doctor_nao_grava_o_que_nao_e_login() {
+  make_gh_stub; export GIT_COMMANDS_GH="$SANDBOX/stub/gh"
+  local out cfg antes corpo
+  cfg="$(gc home)/config"; corpo=$'{\n  "message": "Bad credentials",\n  "status": "401"\n}'
+  gc config set github_user fulano; antes=$(cat "$cfg")
+  # O gh confirma o login (auth status sai com 0), mas a API responde com um erro HTTP: o gh escreve o corpo do erro no
+  # stdout e sai com 1. Isso não é um login: não aparece em gh_user=, não vai para o config e as linhas seguem chave=valor.
+  out=$(STUB_GH_API_ERROR="$corpo" gc doctor)
+  assert_eq "gh_auth=yes" "$(linha_de "$out" gh_auth)" "o login do gh está confirmado"
+  assert_eq "gh_user=" "$(linha_de "$out" gh_user)" "o corpo do erro não é um login"
+  assert_eq "" "$(printf '%s\n' "$out" | grep -v '^[a-z_]*=')" "só linhas chave=valor"
+  assert_eq "github_user=fulano" "$(linha_de "$out" github_user)" "o login gravado continua"
+  assert_eq "$antes" "$(cat "$cfg")" "o config não ganhou linha nenhuma"
+  # Um erro de uma palavra só tem forma de login: quem diz que não vale é o código de saída do gh.
+  out=$(STUB_GH_API_ERROR=Forbidden gc doctor)
+  assert_eq "gh_user=" "$(linha_de "$out" gh_user)" "erro de uma palavra: gh_user"
+  assert_eq "$antes" "$(cat "$cfg")" "erro de uma palavra: o config ficou igual"
+  # A API responde com sucesso, mas com algo que não tem forma de login (duas linhas): também não vale.
+  out=$(STUB_GH_API_USER=$'a\nb' gc doctor)
+  assert_eq "gh_user=" "$(linha_de "$out" gh_user)" "resposta sem forma de login: gh_user"
+  assert_eq "" "$(printf '%s\n' "$out" | grep -v '^[a-z_]*=')" "resposta sem forma de login: só linhas chave=valor"
+  assert_eq "$antes" "$(cat "$cfg")" "resposta sem forma de login: o config ficou igual"
+}
+
 test_doctor_sem_rede() {
   make_gh_stub; local out
   out=$(STUB_GH_AUTH=1 STUB_GH_OFFLINE=1 GIT_COMMANDS_GH="$SANDBOX/stub/gh" gc doctor)

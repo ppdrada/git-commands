@@ -30,6 +30,34 @@ test_github_user_vem_do_gh() {
   assert_eq "ppdrada" "$(gc config get github_user)" "o config continua igual"
 }
 
+test_github_user_so_vale_com_forma_de_login() {
+  . "$PLUGIN/lib/common.sh"; . "$PLUGIN/lib/doctor.sh"; . "$PLUGIN/lib/folders.sh"
+  # GIT_COMMANDS_GH aponta para o stub: o gh da máquina nunca entra.
+  make_gh_stub; export GIT_COMMANDS_GH="$SANDBOX/stub/gh"
+  local out rc v cfg; cfg="$(gc_home)/config"
+  # O que o gh do computador responde e não tem forma de login (o corpo de um erro, duas linhas, dois nomes, começo com -)
+  # é como se não houvesse login: não imprime nada e não grava nada.
+  for v in '{' $'a\nb' 'dois nomes' '-x'; do
+    out=$(STUB_GH_USER=$v gc_github_user); rc=$?
+    assert_eq "0" "$rc" "[$v]: código"; assert_eq "" "$out" "[$v]: saída"
+    grep -q '^github_user=' "$cfg" 2>/dev/null && fail "gravou [$v] no config"
+  done
+  assert_eq "" "$(gc config get github_user)" "nada foi gravado"
+  # O mesmo vale para o que já está no config: o corpo de um erro que uma versão com defeito gravou (a primeira linha dele
+  # é o valor) não é login. Sem login no gh, não imprime nada; com login no gh, o login do gh o troca.
+  printf '%s\n' 'github_user={' '  "message": "Bad credentials",' '  "status": "401"' '}' > "$cfg"
+  out=$(STUB_GH_USER= gc_github_user); rc=$?
+  assert_eq "0" "$rc" "erro no config, gh sem login: código"; assert_eq "" "$out" "erro no config, gh sem login: saída"
+  out=$(STUB_GH_USER=ppdrada gc_github_user); rc=$?
+  assert_eq "0" "$rc" "erro no config, gh logado: código"; assert_eq "ppdrada" "$out" "erro no config, gh logado: saída"
+  assert_eq "ppdrada" "$(gc config get github_user)" "o login do gh trocou o erro"
+  # Um login com maiúsculas, - e _ tem forma de login: vale como veio.
+  gc_config_set github_user ""
+  out=$(STUB_GH_USER=Mona-Lisa_octo gc_github_user)
+  assert_eq "Mona-Lisa_octo" "$out" "login do gh com maiúsculas, - e _"
+  assert_eq "Mona-Lisa_octo" "$(gc_config_get github_user)" "gravado como veio"
+}
+
 # Os testes de "git-commands folders" rodam com GIT_COMMANDS_GH=/nao/existe: só o list olha o login da
 # pessoa, e o gh logado da máquina de quem desenvolve nunca pode entrar.
 

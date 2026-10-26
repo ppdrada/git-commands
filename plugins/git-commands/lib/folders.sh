@@ -3,16 +3,18 @@
 # ela mandou ignorar.
 
 # Login da pessoa no GitHub. Vem do config (github_user); se estiver vazio, pergunta ao gh do
-# computador, que guarda o login em arquivo (sem rede), e grava a resposta no config. Sem gh ou
-# sem login não imprime nada, e sai com 0 do mesmo jeito.
+# computador, que guarda o login em arquivo (sem rede), e grava a resposta no config. Só vale o que tem
+# forma de login (gc_is_github_login): outra coisa, venha do config ou do gh, é como se não houvesse login e
+# não é gravada nem impressa. Sem gh ou sem login não imprime nada, e sai com 0 do mesmo jeito.
 gc_github_user() {
   local u gh
   u=$(gc_config_get github_user)
+  gc_is_github_login "$u" || u=""
   if [ -z "$u" ]; then
     gh=$(gc_gh_bin)
     if [ -n "$gh" ]; then
       u=$(gc_run_with_timeout 10 "$gh" config get -h github.com user 2>/dev/null)
-      [ -n "$u" ] && gc_config_set github_user "$u"
+      if gc_is_github_login "$u"; then gc_config_set github_user "$u"; else u=""; fi
     fi
   fi
   [ -n "$u" ] && printf '%s\n' "$u"

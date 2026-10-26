@@ -73,7 +73,10 @@ gc_cmd_doctor() {
     gh_v=$(gc_run_with_timeout 15 "$gh" --version 2>/dev/null | head -n 1 | sed -n 's/^gh version \([^ ]*\).*/\1/p')
     if auth_out=$(gc_run_with_timeout 15 "$gh" auth status --hostname github.com 2>&1); then
       gh_auth=yes
-      gh_user=$(gc_run_with_timeout 15 "$gh" api user --jq .login 2>/dev/null)
+      # Só vale o login que a API deu com sucesso (num erro HTTP o gh escreve o corpo do erro no stdout e sai com 1) e que tem
+      # forma de login: o resto é como se a API não tivesse respondido, e nem aparece em gh_user nem vai para o config.
+      gh_user=$(gc_run_with_timeout 15 "$gh" api user --jq .login 2>/dev/null) || gh_user=""
+      gc_is_github_login "$gh_user" || gh_user=""
     elif "$gh" auth token >/dev/null 2>&1; then
       # Há um token guardado, mas o login não foi confirmado. Sem internet, o gh auth status só
       # diz que o token é inválido; quem mostra a falta de conexão é uma chamada à API.
@@ -86,7 +89,7 @@ gc_cmd_doctor() {
   fi
   k=$(gc_ssh_key) && ssh_pub="$k.pub"
   # O login que a API confirmou vale mais que o gravado: a pessoa pode ter trocado de conta no gh, e é com o login que a busca na
-  # pasta do usuário reconhece os projetos dela. Se a API não respondeu (sem rede, sem login), o que está gravado fica como está.
+  # pasta do usuário reconhece os projetos dela. Se a API não deu um login (sem rede, sem login, erro), o que está gravado fica.
   if [ -n "$gh_user" ] && [ "$gh_user" != "$(gc_config_get github_user)" ]; then gc_config_set github_user "$gh_user"; fi
   h=$(gc_home)
   printf 'os=%s\n' "$(gc_os)"
