@@ -120,3 +120,59 @@ gc_cmd_folders() {
       return 1 ;;
   esac
 }
+
+# ---------- a busca na pasta do usuário ----------
+
+# Os .git que ficam dentro das pastas diretas da pasta $1, um por linha. Ficam de fora, pelo NOME da pasta e nunca
+# pelo caminho (a pasta do usuário de um teste pode estar dentro de uma AppData): as escondidas, AppData e
+# node_modules, e no Mac também Library, Desktop, Documents e Downloads, que o macOS protege. Em cada pasta o find
+# desce até 5 níveis (o .git de ~/a/b/c/d/projeto fica na profundidade 5), pula as escondidas e as node_modules e
+# continua descendo dentro dos repositórios. Uma pasta que é atalho (link) não é seguida: a busca não sai de $1.
+# Roda no gc_run_with_timeout, num subshell em segundo plano: quando o tempo acaba, ele recebe o TERM e leva o find
+# que estiver rodando junto, para a busca parar de verdade em vez de ficar lendo o disco. O 143 é o código de quem
+# morre por TERM, o que o gc_run_with_timeout entende como tempo estourado.
+gc_home_find() {
+  local d nome mac= filho=
+  [ "$(gc_os)" = mac ] && mac=1
+  trap 'kill $filho 2>/dev/null; exit 143' TERM
+  for d in "$1"/*/; do
+    d=${d%/}; nome=${d##*/}
+    [ -d "$d" ] || continue
+    case "$nome" in .*|AppData|node_modules) continue ;; esac
+    if [ -n "$mac" ]; then
+      case "$nome" in Library|Desktop|Documents|Downloads) continue ;; esac
+    fi
+    find "$d" -maxdepth 5 \( -name '.*' ! -name .git -o -name node_modules \) -prune -o -name .git -print -prune 2>/dev/null &
+    filho=$!
+    wait "$filho"
+    filho=
+  done
+  return 0
+}
+
+# Os repositórios da pasta do usuário ($HOME) cujo origin é do GitHub e tem o dono igual ao login $1, sem
+# diferenciar maiúsculas, um por linha. Só lista pastas e lê o origin de cada repositório: não usa a rede e não lê os
+# arquivos dos projetos. Sai sempre com 0. A busca tem um limite de tempo, GIT_COMMANDS_SEARCH_SECS (só para os
+# testes, 20 s se não existir): se ele estoura, avisa no stderr e segue com o que já achou. A saída do find vai para
+# um arquivo temporário, e o stdin, o stdout e o stderr da busca não são os de quem chamou: o que sobrar vivo não
+# segura nem escreve na saída dele.
+gc_home_repos() {
+  local login secs root tmp rc linha repo url
+  login=$(printf '%s' "$1" | tr 'A-Z' 'a-z')
+  [ -n "$login" ] || return 0
+  root=$(gc_real_dir "$HOME") || return 0
+  secs=${GIT_COMMANDS_SEARCH_SECS:-20}
+  tmp=$(mktemp "${TMPDIR:-/tmp}/git-commands-busca.XXXXXX" 2>/dev/null) || return 0
+  gc_run_with_timeout "$secs" gc_home_find "$root" </dev/null >"$tmp" 2>/dev/null
+  rc=$?
+  if [ "$rc" -eq 124 ]; then
+    printf 'git-commands: aviso: a busca na pasta do usuário passou de %s segundos e parou no meio\n' "$secs" >&2
+  fi
+  while IFS= read -r linha || [ -n "$linha" ]; do
+    repo=${linha%/.git}
+    url=$(git -C "$repo" config --get remote.origin.url 2>/dev/null)
+    [ "$(gc_github_owner "$url")" = "$login" ] && printf '%s\n' "$repo"
+  done < "$tmp"
+  rm -f "$tmp"
+  return 0
+}

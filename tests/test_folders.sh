@@ -244,3 +244,109 @@ test_folders_uso() {
   assert_contains "$(gc 2>&1)" "folders" "gc_usage"
   return 0
 }
+
+# ---------- a busca na pasta do usuário ----------
+
+# Estes testes usam a pasta do usuário do sandbox ($HOME) e repositórios feitos por make_repo_at, que não têm
+# remoto de verdade: a busca só lê o endereço do origin e nunca vai à rede.
+
+# Os repositórios que o gc_home_repos acha para o login $1, em ordem: a ordem em que o find lista não vale nada.
+achados() { gc_home_repos "$@" | LC_ALL=C sort; }
+
+# O caminho real de cada pasta, dada a partir da pasta do usuário, em ordem.
+esperados() { local p; for p in "$@"; do gc_real_dir "$HOME/$p"; done | LC_ALL=C sort; }
+
+test_busca_acha_os_projetos_da_conta() {
+  . "$PLUGIN/lib/common.sh"; . "$PLUGIN/lib/folders.sh"
+  # A pasta do usuário do teste fica dentro de uma pasta escondida, de uma AppData e de uma node_modules: as
+  # regras de pular valem pelo nome das pastas de dentro dela, nunca pelo caminho.
+  export HOME="$SANDBOX/.cache/AppData/node_modules/home" TMPDIR="$SANDBOX/tmp"
+  mkdir -p "$HOME" "$TMPDIR"
+  local r out rc
+  # Da conta: uma logo abaixo de uma pasta, uma a 5 níveis (o .git dela fica na profundidade 5 contando da pasta
+  # de cima), uma guardada dentro de outro projeto e uma numa pasta com espaço no nome.
+  for r in Documents/a a/b/c/d/projeto Documents/a/dentro; do make_repo_at "$HOME/$r" teste >/dev/null; done
+  make_repo_at "$HOME/Meus Projetos/site velho" teste site-velho >/dev/null
+  # De fora: funda demais, escondida (logo na pasta do usuário e dentro de outra pasta), em AppData, em node_modules,
+  # de outra conta, de um dono que só começa igual ao login e sem origin.
+  for r in a/b/c/d/e/fundo .claude/plugins/marketplaces/x Documents/.escondida/y \
+    AppData/Local/x Documents/node_modules/x; do
+    make_repo_at "$HOME/$r" teste >/dev/null
+  done
+  make_repo_at "$HOME/Documents/outro" outra-conta >/dev/null
+  make_repo_at "$HOME/Documents/parecido" teste-dois >/dev/null
+  git init -q -b main "$HOME/Documents/sem-origin"
+  # Também fica de fora uma pasta que é atalho para outra (onde o sistema faz atalho de verdade): a busca não sai da
+  # pasta do usuário. Onde o ln -s só copia (Git Bash sem permissão), a cópia sai e o teste segue sem ela.
+  make_repo_at "$SANDBOX/fora/x" teste >/dev/null
+  ln -s "$SANDBOX/fora" "$HOME/atalho" 2>/dev/null
+  [ -L "$HOME/atalho" ] || rm -rf "$HOME/atalho"
+  out=$(gc_home_repos teste 2>"$SANDBOX/err"); rc=$?
+  assert_eq "0" "$rc" "código"
+  assert_eq "$(esperados Documents/a Documents/a/dentro a/b/c/d/projeto "Meus Projetos/site velho")" \
+    "$(printf '%s\n' "$out" | LC_ALL=C sort)" "os projetos da conta"
+  assert_eq "" "$(cat "$SANDBOX/err")" "sem aviso quando acaba dentro do limite"
+  assert_eq "" "$(ls "$TMPDIR")" "não sobra arquivo temporário"
+  # Sem login não há conta: não acha nada, e o repositório sem origin não vira "da conta" por ter o dono vazio.
+  out=$(gc_home_repos ""); rc=$?
+  assert_eq "0" "$rc" "sem login: código"; assert_eq "" "$out" "sem login: nada"
+}
+
+test_busca_no_mac_pula_as_pastas_protegidas() {
+  . "$PLUGIN/lib/common.sh"; . "$PLUGIN/lib/folders.sh"
+  local r
+  for r in Documents/a Desktop/c Downloads/d Library/x projetos/b; do make_repo_at "$HOME/$r" teste >/dev/null; done
+  # No Mac o macOS pergunta se o programa pode ler essas pastas: a busca nem entra nelas.
+  assert_eq "$(esperados projetos/b)" "$(GIT_COMMANDS_OS=mac achados teste)" "mac: só a pasta que não é protegida"
+  # Nos outros sistemas elas valem como qualquer outra.
+  assert_eq "$(esperados Documents/a Desktop/c Downloads/d Library/x projetos/b)" \
+    "$(GIT_COMMANDS_OS=linux achados teste)" "linux: todas"
+}
+
+test_busca_com_dono_em_maiusculas() {
+  . "$PLUGIN/lib/common.sh"; . "$PLUGIN/lib/folders.sh"
+  local todos
+  make_repo_at "$HOME/Documents/c" TESTE c >/dev/null
+  make_repo_at "$HOME/Documents/d" teste d >/dev/null
+  make_repo_at "$HOME/Documents/e" teste e >/dev/null
+  git -C "$HOME/Documents/e" remote set-url origin git@github.com:Teste/e.git
+  todos=$(esperados Documents/c Documents/d Documents/e)
+  # O dono do endereço vale em qualquer grafia, e o login também: o github_user guarda como o gh devolveu.
+  assert_eq "$todos" "$(achados teste)" "login em minúsculas"
+  assert_eq "$todos" "$(achados TESTE)" "login em maiúsculas"
+  assert_eq "$todos" "$(achados Teste)" "login com a primeira letra maiúscula"
+}
+
+test_busca_lenta_para_no_limite() {
+  . "$PLUGIN/lib/common.sh"; . "$PLUGIN/lib/folders.sh"
+  export TMPDIR="$SANDBOX/tmp"; mkdir -p "$TMPDIR" "$SANDBOX/stub"
+  local find_real t0 err rc
+  # Duas pastas na pasta do usuário: a primeira a busca lê logo, e na segunda o find é lento.
+  make_repo_at "$HOME/rapida/b" teste >/dev/null
+  make_repo_at "$HOME/zlenta/c" teste >/dev/null
+  # O find falso dorme 5 s antes de chamar o de verdade, mas só na pasta zlenta. Se chegar ao fim do sono, deixa
+  # um marcador; se for parado, leva o sleep junto e sai. Ele chama o find pelo caminho achado antes de pôr o stub
+  # no PATH. No Windows esse caminho tem de ser o find do Git Bash, e não o find.exe do sistema (que não entende as
+  # opções): se o do PATH não funcionar como find, usa o /usr/bin/find.
+  find_real=$(command -v find)
+  "$find_real" "$SANDBOX" -maxdepth 0 >/dev/null 2>&1 || find_real=/usr/bin/find
+  printf '%s\n' '#!/usr/bin/env bash' \
+    "trap 'kill \$!; exit 143' TERM" \
+    "case \"\$1\" in */zlenta) sleep 5 & wait \$!; : > \"$SANDBOX/find-acabou\" ;; esac" \
+    "exec \"$find_real\" \"\$@\"" > "$SANDBOX/stub/find"
+  chmod +x "$SANDBOX/stub/find"
+  export PATH="$SANDBOX/stub:$PATH"
+  # O stderr vem por um cano ($(...)): um find que ficasse vivo com ele aberto seguraria a volta até acabar.
+  t0=$SECONDS
+  err=$(GIT_COMMANDS_SEARCH_SECS=1 gc_home_repos teste 2>&1 >"$SANDBOX/out"); rc=$?
+  [ $((SECONDS - t0)) -lt 4 ] || fail "a busca não parou no limite: levou $((SECONDS - t0)) s"
+  assert_eq "0" "$rc" "código"
+  assert_eq "git-commands: aviso: a busca na pasta do usuário passou de 1 segundos e parou no meio" "$err" "o aviso"
+  assert_eq "$(esperados rapida/b)" "$(cat "$SANDBOX/out")" "fica o que ela achou antes do limite"
+  assert_eq "" "$(ls "$TMPDIR")" "não sobra arquivo temporário"
+  # Passado o tempo em que o find falso acabaria, a busca parou de verdade (nenhum marcador) e nada foi escrito
+  # na saída de quem chamou.
+  sleep 5
+  [ -e "$SANDBOX/find-acabou" ] && fail "o find lento continuou rodando depois do limite"
+  assert_eq "$(esperados rapida/b)" "$(cat "$SANDBOX/out")" "nada escrito depois do limite"
+}
