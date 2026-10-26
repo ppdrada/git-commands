@@ -31,6 +31,8 @@ type Mundo = {
   avisos: string[]
   perguntas: string[]
   abertos: string[]
+  /** se a tela consegue mostrar o painel */
+  abre: boolean
   /** escritas, rede e comandos: o painel nunca pode pedir nenhum */
   proibidos: string[]
 }
@@ -41,7 +43,16 @@ type Mundo = {
  * arquivo é reconhecido pelas duas últimas partes do caminho.
  */
 function mundo(on: On, inicio: Arquivos): Mundo {
-  const m: Mundo = { arquivos: inicio, lidos: [], status: [], avisos: [], perguntas: [], abertos: [], proibidos: [] }
+  const m: Mundo = {
+    arquivos: inicio,
+    lidos: [],
+    status: [],
+    avisos: [],
+    perguntas: [],
+    abertos: [],
+    abre: true,
+    proibidos: [],
+  }
   on('fs.read', (_, e) => {
     m.lidos.push(e.path)
     const partes = e.path.split(/[\\/]/)
@@ -60,7 +71,7 @@ function mundo(on: On, inicio: Arquivos): Mundo {
   on('command.register', (_, e) => ({ value: { command: e.name } }))
   on('ui.open', (_, e) => {
     m.abertos.push(e.id)
-    return { value: { isPlaced: true } }
+    return { value: m.abre ? { isPlaced: true } : { isPlaced: false, reason: 'no-surface' } }
   })
   on('prompt.submit', (_, e) => {
     m.perguntas.push(e.text)
@@ -278,4 +289,85 @@ test('aviso rápido só quando uma verificação nova traz novidade', async ($, 
 
   await relogio.advance(MINUTO)
   expect(m.avisos.length).toBe(1)
+})
+
+const PAINEL = {
+  plugin: 'git-commands-painel',
+  component: 'Pane',
+  requestId: 'painel',
+  props: {
+    title: 'git-commands',
+    isFocused: false,
+    bodyColumns: 60,
+    placement: 'dock',
+    scroll: { offset: 0, bodyRows: 20 },
+    view: {},
+  },
+} as const
+
+const PAINEL_PEDIDO = {
+  command: 'painel',
+  args: '',
+  origin: { kind: 'composer' },
+  presentation: { isFullscreen: false, columns: 120 },
+} as const
+
+test('/painel abre o painel com o estado de cada projeto, em todas as telas', async ($, on) => {
+  mock.clock(on, { now: AGORA })
+  mock.env(on, { HOME: '/casa' })
+  const m = mundo(on, arquivos({ 'status.tsv': `C:/git/api\tapi\tmain\t0\t0\t0\tem-dia\n${COM_NOVIDADES.split('\n')[0]}\n` }))
+  await abrir($)
+
+  expect(await $.command.run(PAINEL_PEDIDO)).toEqual({})
+  expect(m.abertos).toEqual(['painel'])
+
+  for (const surface of TELAS) {
+    const ui = await $.ui.mount({ ...PAINEL, surface })
+    expect((await ui.findAll({ type: 'Text' })).map(t => t.text)).toEqual([
+      'Última verificação há 5 minutos. Ela roda a cada 30 minutos.',
+      'site (main): com novidades (3)',
+      'api (main): em dia',
+      'Para ver e atualizar, peça ao Claude: "tem algo novo nos meus projetos?"',
+    ])
+    await ui.unmount()
+  }
+})
+
+test('o painel explica quando a verificação está desligada', async ($, on) => {
+  mock.clock(on, { now: AGORA })
+  mock.env(on, { HOME: '/casa' })
+  mundo(on, {})
+  await abrir($)
+  await $.command.run(PAINEL_PEDIDO)
+
+  const ui = await $.ui.mount({ ...PAINEL, surface: 'desktop' })
+  expect((await ui.findAll({ type: 'Text' })).map(t => t.text)).toEqual([
+    'A verificação automática está desligada. Para ligar, peça ao Claude: "quero que verifique meus projetos sozinho".',
+  ])
+  await ui.unmount()
+})
+
+test('sem projetos do GitHub, o painel diz isso', async ($, on) => {
+  mock.clock(on, { now: AGORA })
+  mock.env(on, { HOME: '/casa' })
+  mundo(on, arquivos({ 'status.tsv': '\n' }))
+  await abrir($)
+  await $.command.run(PAINEL_PEDIDO)
+
+  const ui = await $.ui.mount({ ...PAINEL, surface: 'terminal' })
+  expect((await ui.findAll({ type: 'Text' })).map(t => t.text)).toEqual([
+    'Última verificação há 5 minutos. Ela roda a cada 30 minutos.',
+    'Nenhum projeto do GitHub na pasta de projetos.',
+  ])
+  await ui.unmount()
+})
+
+test('quando não dá para abrir, o comando diz isso', async ($, on) => {
+  mock.clock(on, { now: AGORA })
+  mock.env(on, { HOME: '/casa' })
+  const m = mundo(on, arquivos())
+  m.abre = false
+  await abrir($)
+
+  expect(await $.command.run(PAINEL_PEDIDO)).toEqual({ text: 'Não deu para abrir o painel aqui.' })
 })

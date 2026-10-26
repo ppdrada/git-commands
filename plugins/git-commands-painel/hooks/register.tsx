@@ -4,11 +4,12 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Resumo } from '../types'
-import { assinatura, atrasada, comNovidades, lerHora, resumir, temNovidadeNova } from './resumo'
+import { assinatura, atrasada, comNovidades, lerHora, ordenarParaOPainel, resumir, temNovidadeNova } from './resumo'
 import type { Arquivos } from './resumo'
-import { linhaDeStatus, listaDeNovidades, PERGUNTA } from './textos'
+import { cabecalhoDoPainel, corDoEstado, linhaDeStatus, listaDeNovidades, PERGUNTA, rotuloDoEstado } from './textos'
 
 const MINUTO = 60_000
+const PAINEL = 'painel'
 
 const resumo = atom({ plugin: 'git-commands-painel', key: 'resumo' } as const, null)
 const parada = atom({ plugin: 'git-commands-painel', key: 'parada' } as const, null)
@@ -82,6 +83,7 @@ async function atualizar($: EngineInterface): Promise<void> {
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
+    await $.command.register({ name: PAINEL, description: 'Mostra o estado dos seus projetos do GitHub (git-commands)' })
     await atualizar($)
     $.clock.every(MINUTO, () => {
       void atualizar($)
@@ -114,6 +116,39 @@ export const register: Register = on => {
         <Text>Novidades no GitHub: {listaDeNovidades(atual.projetos)}</Text>
         <Button key="ver" label="Ver agora" variant="primary" onPress={verAgora} />
         <Button key="depois" label="Depois" onPress={esconder} />
+      </Box>
+    )
+  })
+
+  on('command.run', { command: PAINEL }, async $ => {
+    await atualizar($)
+    const aberto = await $.ui.open({ id: PAINEL, title: 'git-commands' })
+    return aberto.isPlaced ? {} : { text: 'Não deu para abrir o painel aqui.' }
+  })
+
+  // O painel ao lado da conversa: todos os projetos, os que pedem atenção primeiro.
+  on('ui.render', { component: 'Pane', requestId: PAINEL }, async ($, e) => {
+    const { Box, Text } = $.ui.resolve(e)
+    const atual = await read($, resumo)
+    if (atual === null) return <Text dimColor>Lendo o estado dos projetos…</Text>
+
+    const semProjetos = atual.situacao !== 'desligada' && atual.projetos.length === 0
+    return (
+      <Box flexDirection="column" gap={1}>
+        <Text dimColor>{cabecalhoDoPainel(atual)}</Text>
+        {atual.projetos.length > 0 && (
+          <Box flexDirection="column">
+            {ordenarParaOPainel(atual.projetos).map(p => (
+              <Text color={corDoEstado(p.estado)}>
+                {p.nome} ({p.branch}): {rotuloDoEstado(p)}
+              </Text>
+            ))}
+          </Box>
+        )}
+        {semProjetos && <Text dimColor>Nenhum projeto do GitHub na pasta de projetos.</Text>}
+        {comNovidades(atual.projetos).length > 0 && (
+          <Text dimColor>Para ver e atualizar, peça ao Claude: "{PERGUNTA}"</Text>
+        )}
       </Box>
     )
   })
