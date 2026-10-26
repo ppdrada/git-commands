@@ -1,14 +1,16 @@
 import { expect, test } from 'claude-code/testing'
 
 import {
-  assinatura,
   atrasada,
+  entradas,
   lerConfig,
   lerErro,
   lerHora,
   lerProjetos,
   ordenarParaOPainel,
+  podarEscondidas,
   resumir,
+  temNovidadeAMostrar,
   temNovidadeNova,
 } from '../hooks/resumo'
 import type { Projeto } from '../types'
@@ -114,12 +116,24 @@ test('temNovidadeNova só quando algum projeto ganhou commits', () => {
   expect(temNovidadeNova(antes, [])).toBe(false)
 })
 
-test('assinatura e ordenarParaOPainel', () => {
+test('entradas: cada projeto com novidades e quantos commits', () => {
   expect(
-    assinatura([projeto('site', 'novidades', 3), projeto('blog', 'em-dia'), projeto('api', 'divergiu', 1, 2), projeto('velho', 'novidades', 0)]),
-  ).toBe('C:/git/site:3|C:/git/api:1')
-  expect(assinatura([projeto('blog', 'em-dia')])).toBe('')
+    entradas([projeto('site', 'novidades', 3), projeto('blog', 'em-dia'), projeto('api', 'divergiu', 1, 2), projeto('velho', 'novidades', 0)]),
+  ).toEqual(['C:/git/site:3', 'C:/git/api:1'])
+  expect(entradas([projeto('blog', 'em-dia')])).toEqual([])
+})
 
+test('a faixa só volta com novidade que ainda não foi escondida', () => {
+  const escondidas = ['C:/git/site:3', 'C:/git/api:1']
+  expect(temNovidadeAMostrar([projeto('site', 'novidades', 3), projeto('api', 'novidades', 1)], escondidas)).toBe(false)
+  expect(temNovidadeAMostrar([projeto('site', 'novidades', 3)], escondidas)).toBe(false)
+  expect(temNovidadeAMostrar([projeto('site', 'novidades', 4)], escondidas)).toBe(true)
+  expect(temNovidadeAMostrar([projeto('site', 'novidades', 3), projeto('blog', 'novidades', 1)], escondidas)).toBe(true)
+  expect(temNovidadeAMostrar([], [])).toBe(false)
+  expect(podarEscondidas(escondidas, [projeto('site', 'novidades', 3), projeto('api', 'em-dia')])).toEqual(['C:/git/site:3'])
+})
+
+test('ordenarParaOPainel', () => {
   const ordem = ordenarParaOPainel([projeto('a', 'em-dia'), projeto('b', 'erro'), projeto('c', 'novidades', 2)])
   expect(ordem.map(p => p.nome)).toEqual(['c', 'b', 'a'])
 })

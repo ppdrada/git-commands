@@ -4,7 +4,17 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Resumo } from '../types'
-import { assinatura, atrasada, comNovidades, lerHora, ordenarParaOPainel, resumir, temNovidadeNova } from './resumo'
+import {
+  atrasada,
+  comNovidades,
+  entradas,
+  lerHora,
+  ordenarParaOPainel,
+  podarEscondidas,
+  resumir,
+  temNovidadeAMostrar,
+  temNovidadeNova,
+} from './resumo'
 import type { Arquivos } from './resumo'
 import { cabecalhoDoPainel, corDoEstado, linhaDeStatus, listaDeNovidades, PERGUNTA, rotuloDoEstado } from './textos'
 
@@ -13,7 +23,7 @@ const PAINEL = 'painel'
 
 const resumo = atom({ plugin: 'git-commands-painel', key: 'resumo' } as const, null)
 const parada = atom({ plugin: 'git-commands-painel', key: 'parada' } as const, null)
-const escondida = atom({ plugin: 'git-commands-painel', key: 'escondida' } as const, null)
+const escondidas = atom({ plugin: 'git-commands-painel', key: 'escondidas' } as const, null)
 const avisado = atom({ plugin: 'git-commands-painel', key: 'avisado' } as const, null)
 
 /** A mesma pasta que o bash usa: GIT_COMMANDS_HOME, senão ~/.git-commands (no Windows, o HOME pode faltar). */
@@ -71,6 +81,12 @@ async function atualizar($: EngineInterface): Promise<void> {
     await update($, resumo, () => novo)
     await avisarNovidades($, novo)
 
+    const ocultas = await read($, escondidas)
+    if (ocultas !== null) {
+      const podadas = podarEscondidas(ocultas, novo.projetos)
+      if (podadas.length !== ocultas.length) await update($, escondidas, () => podadas)
+    }
+
     const linha = linhaDeStatus(novo)
     if (linha !== ultimaLinha) {
       $.ui.status(linha)
@@ -98,16 +114,16 @@ export const register: Register = on => {
     return fim
   })
 
-  // A faixa acima da caixa de mensagem: só com novidades, e some até a lista mudar.
+  // A faixa acima da caixa de mensagem: só com novidades, e some até chegar uma que ainda não foi escondida.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const atual = await read($, resumo)
     const valeMostrar = atual?.situacao === 'ok' || atual?.situacao === 'esperando'
     if (e.props.hasSurvey || atual === null || !valeMostrar) return next(e)
-    const lista = assinatura(atual.projetos)
-    if (lista === '' || (await read($, escondida)) === lista) return next(e)
+    if (!temNovidadeAMostrar(atual.projetos, (await read($, escondidas)) ?? [])) return next(e)
 
     const { Box, Button, Text } = $.ui.resolve(e)
-    const esconder = () => update($, escondida, () => lista)
+    const desenhadas = entradas(atual.projetos)
+    const esconder = () => update($, escondidas, antes => [...new Set([...(antes ?? []), ...desenhadas])])
     const verAgora = async () => {
       await esconder()
       void $.prompt.submit({ text: PERGUNTA })

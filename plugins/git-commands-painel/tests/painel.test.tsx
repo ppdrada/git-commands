@@ -388,3 +388,24 @@ test('a faixa continua enquanto espera a verificação e some quando ela para', 
   expect(await ui.find({ type: 'Text', text: /Novidades/ })).toBeUndefined()
   await ui.unmount()
 })
+
+test('a faixa não volta quando um projeto sai da lista', async ($, on) => {
+  const relogio = mock.clock(on, { now: AGORA })
+  mock.env(on, { HOME: '/casa' })
+  const m = mundo(on, arquivos({ 'status.tsv': DUAS_NOVIDADES }))
+  await abrir($)
+
+  const ui = await $.ui.mount({ ...FAIXA, surface: 'desktop' })
+  await ui.press({ key: 'ver' })
+
+  // A pessoa atualiza o api e deixa o site para depois: o updates pull refaz a linha do api.
+  m.arquivos['status.tsv'] = DUAS_NOVIDADES.replace('\t0\t1\t0\tnovidades', '\t0\t0\t0\tem-dia')
+  await $.turn.complete(fimDaResposta())
+  expect(await ui.find({ type: 'Text', text: /Novidades/ })).toBeUndefined()
+
+  // Mais tarde, o api ganha um commit novo: isso ninguém tinha visto ainda.
+  m.arquivos['status.tsv'] = DUAS_NOVIDADES
+  await relogio.advance(MINUTO)
+  expect((await ui.find({ type: 'Text', text: /Novidades/ }))?.text).toBe('Novidades no GitHub: site (3), api (1)')
+  await ui.unmount()
+})

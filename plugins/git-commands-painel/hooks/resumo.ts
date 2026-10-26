@@ -99,11 +99,20 @@ export function comNovidades(projetos: readonly Projeto[]): Projeto[] {
   return projetos.filter(p => COM_NOVIDADES.has(p.estado) && p.novos > 0)
 }
 
-/** Identifica a lista de novidades: muda quando entra um projeto ou chegam mais commits. */
-export function assinatura(projetos: readonly Projeto[]): string {
-  return comNovidades(projetos)
-    .map(p => `${p.caminho}:${p.novos}`)
-    .join('|')
+/** Cada novidade como "caminho:commits": muda quando o projeto ganha mais commits. */
+export function entradas(projetos: readonly Projeto[]): string[] {
+  return comNovidades(projetos).map(p => `${p.caminho}:${p.novos}`)
+}
+
+/** A faixa volta só com novidade que a pessoa ainda não escondeu; um projeto que sai da lista não conta. */
+export function temNovidadeAMostrar(projetos: readonly Projeto[], escondidas: readonly string[]): boolean {
+  return entradas(projetos).some(entrada => !escondidas.includes(entrada))
+}
+
+/** Esquece o que já saiu da lista: se aquele projeto ganhar commits de novo, a faixa volta. */
+export function podarEscondidas(escondidas: readonly string[], projetos: readonly Projeto[]): string[] {
+  const atuais = entradas(projetos)
+  return escondidas.filter(entrada => atuais.includes(entrada))
 }
 
 export function temNovidadeNova(antes: Readonly<Record<string, number>>, projetos: readonly Projeto[]): boolean {

@@ -33,8 +33,8 @@ declare module 'claude-code' {
   interface PluginState {
     'git-commands-painel': {
       resumo: Resumo | null
-      /** a lista de novidades (assinatura) que o "Depois" ou o "Ver agora" esconderam */
-      escondida: string | null
+      /** as novidades ("caminho:commits") que o "Depois" ou o "Ver agora" esconderam */
+      escondidas: string[] | null
       /** a última verificação e as novidades de cada projeto que o aviso rápido já viu */
       avisado: { verificadoEm: number | null; novos: Record<string, number> } | null
       /** desde quando a verificação parece atrasada, para aquele status.time */
