@@ -93,7 +93,7 @@ make_crontab_stub() {
     "f=\"$SANDBOX/crontab.txt\"" \
     'case "${1:-}" in' \
     '  -l) [ -s "$f" ] || exit 1; cat "$f" ;;' \
-    '  -) cat > "$f" ;;' \
+    '  -) [ -n "${STUB_CRONTAB_FAIL:-}" ] && exit 1; cat > "$f" ;;' \
     '  -r) : > "$f" ;;' \
     '  *) exit 1 ;;' \
     'esac' > "$SANDBOX/stub/crontab"

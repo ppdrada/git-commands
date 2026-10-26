@@ -45,5 +45,30 @@ test_run_scheduled_grava_status_e_log() {
 test_schedule_real_ida_e_volta() {
   [ "${GIT_COMMANDS_TEST_REAL_SCHEDULE:-}" = 1 ] || skip "defina GIT_COMMANDS_TEST_REAL_SCHEDULE=1"
   [ "$(gc os)" = linux ] && ! command -v crontab >/dev/null && skip "este Linux não tem cron"
+  export GIT_COMMANDS_SCHED_ID="teste-$$"   # nunca mexe na tarefa de verdade da pessoa
   gc schedule enable 30 >/dev/null; assert_eq "ligado 30" "$(gc schedule status)" ""; gc schedule disable >/dev/null; assert_eq "desligado" "$(gc schedule status)" ""
+}
+
+test_schedule_windows_apostrofo() {
+  export HOME="$SANDBOX/home/D'Avila"; mkdir -p "$HOME"
+  dr windows enable 30 >/dev/null; assert_contains "$(cat "$(gc home)/schedule.ps1")" "D''Avila" ""
+}
+
+test_schedule_disable_que_falhou_nao_diz_desligado() {
+  make_crontab_stub ""; dr linux enable 30 >/dev/null
+  local out; out=$(STUB_CRONTAB_FAIL=1 dr linux disable 2>&1); assert_eq "1" "$?" ""
+  assert_not_contains "$out" "desligado" ""; assert_eq "on" "$(gc config get auto_check)" ""
+}
+
+test_schedule_cron_divisores_de_60() {
+  . "$PLUGIN/lib/common.sh"; . "$PLUGIN/lib/schedule.sh"
+  assert_eq "*/30 * * * *" "$(gc_sched_cron_expr 45)" ""; assert_eq "*/6 * * * *" "$(gc_sched_cron_expr 7)" ""
+  assert_eq "0 * * * *" "$(gc_sched_cron_expr 50)" ""; assert_eq "*/20 * * * *" "$(gc_sched_cron_expr 25)" ""
+  make_crontab_stub ""; assert_eq "ligado 30" "$(dr linux enable 45)" "mostra o intervalo de verdade"
+  assert_eq "30" "$(gc config get interval)" ""
+}
+
+test_schedule_nome_de_teste() {
+  GIT_COMMANDS_SCHED_ID=teste dr windows enable 30 >/dev/null; local s; s=$(cat "$(gc home)/schedule.ps1")
+  assert_contains "$s" "'git-commands-teste'" ""; assert_not_contains "$s" "git-commands-verificar" ""
 }
