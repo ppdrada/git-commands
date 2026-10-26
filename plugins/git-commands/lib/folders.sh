@@ -178,3 +178,73 @@ gc_home_repos() {
   rm -f "$tmp"
   return 0
 }
+
+# ---------- a lista de todos os projetos ----------
+
+# 0 se dá para procurar projetos na pasta $1: ela existe e dá para ler. Senão avisa no stderr e sai com 1. $2 é o aviso de "não foi
+# encontrada"; a pasta que existe mas não abre é "sem permissão".
+gc_folders_readable() {
+  if [ ! -d "$1" ]; then
+    printf 'git-commands: aviso: %s: %s\n' "$2" "$1" >&2
+    return 1
+  fi
+  # No macOS, tarefas em segundo plano podem ser proibidas de ler pastas como Documentos.
+  if ! ls "$1" >/dev/null 2>&1; then
+    printf 'git-commands: aviso: sem permissão para ler a pasta: %s\n' "$1" >&2
+    return 1
+  fi
+}
+
+# As pastas onde procurar além da pasta do usuário, uma por linha: a pasta de projetos e as pedidas, as que dá para ler. Cada uma que
+# falta ou não abre vira um aviso no stderr, e as outras seguem.
+gc_folders_sources() {
+  local p pasta
+  p=$(gc_config_get projects_dir)
+  if [ -n "$p" ] && gc_folders_readable "$p" 'a pasta de projetos não foi encontrada'; then printf '%s\n' "$p"; fi
+  gc_folders_lines "$(gc_home)/folders" | while IFS= read -r pasta; do
+    gc_folders_readable "$pasta" 'a pasta pedida não foi encontrada' && printf '%s\n' "$pasta"
+  done
+}
+
+# Passa adiante a lista de caminhos do stdin (na forma do gc_real_dir, em ordem e sem repetição), menos o que fica numa pasta ignorada
+# ou dentro dela: o caminho igual à pasta, ou que começa com ela e uma barra (ignorar ~/proj não esconde ~/projeto). No Windows as
+# letras maiúsculas e minúsculas valem o mesmo (só as ASCII, como no gc_folders_grep), e duas grafias da mesma pasta ficam numa linha
+# só, a primeira. As pastas ignoradas vão para o awk pelo mesmo cano, antes dos caminhos e separadas deles por uma linha vazia.
+gc_folders_filter() {
+  local win=0
+  [ "$(gc_os)" = windows ] && win=1
+  { gc_folders_lines "$(gc_home)/ignored"; printf '\n'; cat; } | LC_ALL=C awk -v win="$win" '
+    !fim {
+      if ($0 == "") { fim = 1; next }
+      ign[++n] = (win == 1 ? tolower($0) : $0)
+      next
+    }
+    {
+      c = (win == 1 ? tolower($0) : $0)
+      for (i = 1; i <= n; i++)
+        if (c == ign[i] || index(c, ign[i] "/") == 1) next
+      if (win == 1 && vistos[c]++) next
+      print
+    }'
+}
+
+# Todos os projetos que a verificação confere, um caminho por linha, em ordem e sem repetição: os da conta do GitHub na pasta do
+# usuário (só com login, de gc_github_user), os do GitHub na pasta de projetos e os das pastas pedidas (nas pastas escolhidas o dono
+# não importa), menos os que ficam numa pasta ignorada ou dentro dela. Cada caminho passa pelo gc_real_dir antes de tudo, porque a
+# mesma pasta pode vir escrita de formas diferentes. Uma fonte que falta ou não dá para ler vira um aviso no stderr, e as outras
+# seguem. Sai com 0 se ao menos uma fonte foi lida; se nenhuma foi, explica no stderr e sai com 1.
+gc_all_repos() {
+  local login fontes pasta r
+  login=$(gc_github_user)
+  fontes=$(gc_folders_sources)
+  if [ -z "$login" ] && [ -z "$fontes" ]; then
+    printf 'git-commands: não há onde procurar projetos: configure a pasta de projetos (skill configurar), faça login no GitHub ou peça uma pasta (git-commands folders add <pasta>)\n' >&2
+    return 1
+  fi
+  {
+    [ -z "$login" ] || gc_home_repos "$login"
+    printf '%s\n' "$fontes" | while IFS= read -r pasta; do
+      [ -z "$pasta" ] || gc_updates_repos "$pasta" </dev/null
+    done
+  } | while IFS= read -r r; do gc_real_dir "$r"; done | LC_ALL=C sort -u | gc_folders_filter
+}

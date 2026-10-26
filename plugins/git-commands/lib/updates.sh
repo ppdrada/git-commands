@@ -56,7 +56,7 @@ gc_updates_line() {
 }
 
 gc_updates_scan() {
-  local fetch=yes save=no dir="" repo="" top out h
+  local fetch=yes save=no dir="" repo="" top out h repos
   while [ $# -gt 0 ]; do
     case "$1" in
       --no-fetch) fetch=no ;;
@@ -74,12 +74,18 @@ gc_updates_scan() {
     gc_updates_line "$top" "$fetch"
     return 0
   fi
-  [ -n "$dir" ] || dir=$(gc_config_get projects_dir)
-  [ -n "$dir" ] || { printf 'git-commands: a pasta de projetos não está configurada (use a skill configurar ou --dir <pasta>)\n' >&2; return 1; }
-  [ -d "$dir" ] || { printf 'git-commands: a pasta de projetos não existe: %s\n' "$dir" >&2; return 1; }
-  # No macOS, tarefas em segundo plano podem ser proibidas de ler pastas como Documentos.
-  ls "$dir" >/dev/null 2>&1 || { printf 'git-commands: sem permissão para ler a pasta de projetos: %s\n' "$dir" >&2; return 1; }
-  out=$(gc_updates_repos "$dir" | while IFS= read -r r; do gc_updates_line "$r" "$fetch"; done)
+  if [ -n "$dir" ]; then
+    # Com --dir, só aquela pasta.
+    [ -d "$dir" ] || { printf 'git-commands: a pasta de projetos não existe: %s\n' "$dir" >&2; return 1; }
+    # No macOS, tarefas em segundo plano podem ser proibidas de ler pastas como Documentos.
+    ls "$dir" >/dev/null 2>&1 || { printf 'git-commands: sem permissão para ler a pasta de projetos: %s\n' "$dir" >&2; return 1; }
+    repos=$(gc_updates_repos "$dir")
+  else
+    # Sem --dir, todos os projetos: pasta do usuário, pasta de projetos e pastas pedidas. Os avisos dela vão para o stderr (o
+    # agendador os põe no check.log), e a falta de lugar onde procurar é erro.
+    repos=$(gc_all_repos) || return 1
+  fi
+  out=$(printf '%s\n' "$repos" | while IFS= read -r r; do [ -z "$r" ] || gc_updates_line "$r" "$fetch"; done)
   [ -z "$out" ] || printf '%s\n' "$out"
   if [ "$save" = yes ]; then
     h=$(gc_home)

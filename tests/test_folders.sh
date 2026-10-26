@@ -355,3 +355,178 @@ test_busca_lenta_para_no_limite() {
   [ -e "$SANDBOX/find-acabou" ] && fail "o find lento continuou rodando depois do limite"
   assert_eq "$(esperados rapida/b)" "$(cat "$SANDBOX/out")" "nada escrito depois do limite"
 }
+
+# ---------- a lista de todos os projetos ----------
+
+# Estes testes montam a pasta do usuário do sandbox ($HOME), a pasta de projetos e as pastas pedidas e chamam o gc_all_repos, que
+# não usa a rede: os repositórios de make_repo_at só existem no disco, e os de make_github_pair nunca são buscados. GIT_COMMANDS_GH
+# aponta sempre para o stub ou para um caminho que não existe, para o gh logado da máquina nunca entrar. O sistema é o Linux,
+# porque no Mac a busca no usuário pula a Documents; quem olha a caixa das letras troca o sistema a cada chamada.
+
+# Carrega todas as bibliotecas, como o executável: a lista usa o gc_updates_repos (updates.sh) e o gc_gh_bin (doctor.sh).
+carrega_libs() { local l; for l in "$PLUGIN"/lib/*.sh; do . "$l"; done; }
+
+# O caminho real de cada pasta dada (caminho completo, ao contrário do esperados), em ordem.
+reais() { local p; for p in "$@"; do gc_real_dir "$p"; done | LC_ALL=C sort; }
+
+test_lista_junta_as_tres_fontes() {
+  carrega_libs; export GIT_COMMANDS_GH=/nao/existe GIT_COMMANDS_OS=linux
+  local out rc
+  gc_config_set github_user teste; gc_config_set projects_dir "$SANDBOX/projetos"
+  # A pasta do usuário: um projeto da conta. A pasta de projetos: um da conta e um de outra conta. Uma pasta pedida: um de outra
+  # conta. Nas pastas escolhidas o dono não importa, então entram os quatro; um da conta que fica fora das três não entra.
+  make_repo_at "$HOME/Documents/a" teste >/dev/null
+  make_github_pair app >/dev/null
+  make_repo_at "$SANDBOX/projetos/de-outra" outra-conta >/dev/null
+  make_repo_at "$SANDBOX/fora/x" outra-conta >/dev/null
+  make_repo_at "$SANDBOX/solto/y" teste >/dev/null
+  gc_cmd_folders add "$SANDBOX/fora" >/dev/null
+  out=$(gc_all_repos 2>"$SANDBOX/err"); rc=$?
+  assert_eq "0" "$rc" "código"
+  assert_eq "$(reais "$HOME/Documents/a" "$SANDBOX/projetos/app" "$SANDBOX/projetos/de-outra" "$SANDBOX/fora/x")" "$out" "os quatro, em ordem"
+  assert_eq "" "$(cat "$SANDBOX/err")" "sem aviso"
+}
+
+test_lista_sem_repeticao_entre_fontes() {
+  carrega_libs; export GIT_COMMANDS_GH=/nao/existe GIT_COMMANDS_OS=linux
+  gc_config_set github_user teste
+  make_repo_at "$HOME/Documents/a" teste >/dev/null
+  # A pasta de projetos é a Documents, escrita na forma do Git Bash ($HOME/Documents: no Windows, /c/... e não C:/...) e a busca no
+  # usuário acha o mesmo projeto: ele aparece uma vez só, na forma real.
+  gc_config_set projects_dir "$HOME/Documents"
+  assert_eq "$(reais "$HOME/Documents/a")" "$(gc_all_repos)" "usuário e pasta de projetos"
+  # Pedir a mesma pasta, escrita de outro jeito, não muda nada.
+  gc_cmd_folders add "$HOME/Documents/../Documents/" >/dev/null
+  assert_eq "$(reais "$HOME/Documents/a")" "$(gc_all_repos)" "mais a pasta pedida"
+}
+
+test_ignorada_some_de_todas_as_fontes() {
+  carrega_libs; export GIT_COMMANDS_GH=/nao/existe GIT_COMMANDS_OS=linux
+  local a="$HOME/Documents/a" copia="$HOME/Documents/a - Cópia" app="$SANDBOX/projetos/app" velho="$SANDBOX/projetos/velho" \
+    velhote="$SANDBOX/projetos/velhote" sub="$SANDBOX/fora/sub" d="$SANDBOX/fora/d"
+  gc_config_set github_user teste; gc_config_set projects_dir "$SANDBOX/projetos"
+  # Na pasta do usuário, um projeto e uma cópia dele (o nome da pasta de um começa igual ao do outro). Na pasta de projetos, um
+  # repositório dentro de "velho" e o "velhote", cujo nome também começa igual. Numa pasta pedida, um dentro de "sub" e um solto.
+  make_repo_at "$a" teste >/dev/null
+  make_repo_at "$copia" teste a-copia >/dev/null
+  make_github_pair app >/dev/null
+  make_repo_at "$velho/b" outra-conta >/dev/null
+  make_repo_at "$velhote" outra-conta >/dev/null
+  make_repo_at "$sub/c" outra-conta >/dev/null
+  make_repo_at "$d" outra-conta >/dev/null
+  gc_cmd_folders add "$SANDBOX/fora" >/dev/null
+  assert_eq "$(reais "$a" "$copia" "$app" "$velho/b" "$velhote" "$sub/c" "$d")" "$(gc_all_repos)" "sem ignorar nada"
+  # Ignorar a pasta "a - Cópia" tira o repositório que é ela mesma da busca no usuário, e o "a" fica.
+  gc_cmd_folders ignore "$copia" >/dev/null
+  assert_eq "$(reais "$a" "$app" "$velho/b" "$velhote" "$sub/c" "$d")" "$(gc_all_repos)" "a busca no usuário"
+  # Ignorar uma pasta da pasta de projetos e uma pasta pedida tira os repositórios de dentro delas, e o "velhote" fica.
+  gc_cmd_folders ignore "$velho" >/dev/null; gc_cmd_folders ignore "$sub" >/dev/null
+  assert_eq "$(reais "$a" "$app" "$velhote" "$d")" "$(gc_all_repos)" "a pasta de projetos e a pasta pedida"
+  # Voltar a mostrar traz o repositório de volta.
+  gc_cmd_folders unignore "$copia" >/dev/null
+  assert_eq "$(reais "$a" "$copia" "$app" "$velhote" "$d")" "$(gc_all_repos)" "voltou a aparecer"
+}
+
+test_pasta_que_falta_nao_para_a_lista() {
+  carrega_libs; export GIT_COMMANDS_GH=/nao/existe GIT_COMMANDS_OS=linux
+  local out rc real
+  gc_config_set github_user teste
+  make_repo_at "$HOME/Documents/a" teste >/dev/null
+  make_repo_at "$SANDBOX/fora/b" outra-conta >/dev/null
+  # A pasta de projetos não existe, uma pasta pedida foi apagada e outra continua lá.
+  gc_config_set projects_dir "$SANDBOX/projetos-que-sumiu"
+  mkdir -p "$SANDBOX/fora/apagada"
+  gc_cmd_folders add "$SANDBOX/fora/apagada" >/dev/null; gc_cmd_folders add "$SANDBOX/fora" >/dev/null
+  real=$(gc_real_dir "$SANDBOX/fora/apagada"); rm -rf "$SANDBOX/fora/apagada"
+  out=$(gc_all_repos 2>"$SANDBOX/err"); rc=$?
+  assert_eq "0" "$rc" "código"
+  assert_eq "$(reais "$HOME/Documents/a" "$SANDBOX/fora/b")" "$out" "a busca no usuário e a pasta pedida que ficou"
+  assert_eq "$(printf '%s\n' "git-commands: aviso: a pasta de projetos não foi encontrada: $SANDBOX/projetos-que-sumiu" \
+    "git-commands: aviso: a pasta pedida não foi encontrada: $real")" "$(cat "$SANDBOX/err")" "um aviso para cada pasta que falta"
+}
+
+test_sem_fonte_nenhuma_da_erro() {
+  carrega_libs; export GIT_COMMANDS_GH=/nao/existe
+  local out rc real msg='git-commands: não há onde procurar projetos: configure a pasta de projetos (skill configurar), faça login no GitHub ou peça uma pasta (git-commands folders add <pasta>)'
+  # Sem login, sem pasta de projetos e sem pastas pedidas.
+  out=$(gc_all_repos 2>"$SANDBOX/err"); rc=$?
+  assert_eq "1" "$rc" "código"; assert_eq "" "$out" "nada no stdout"
+  assert_eq "$msg" "$(cat "$SANDBOX/err")" "o erro, e só ele"
+  # Uma pasta de projetos que não existe e uma pasta pedida que sumiu não são fonte: o mesmo erro, depois dos avisos.
+  gc_config_set projects_dir "$SANDBOX/projetos-que-sumiu"
+  mkdir -p "$SANDBOX/fora/apagada"; gc_cmd_folders add "$SANDBOX/fora/apagada" >/dev/null
+  real=$(gc_real_dir "$SANDBOX/fora/apagada"); rm -rf "$SANDBOX/fora/apagada"
+  out=$(gc_all_repos 2>"$SANDBOX/err"); rc=$?
+  assert_eq "1" "$rc" "com as pastas que faltam: código"; assert_eq "" "$out" "com as pastas que faltam: nada no stdout"
+  assert_eq "$(printf '%s\n' "git-commands: aviso: a pasta de projetos não foi encontrada: $SANDBOX/projetos-que-sumiu" \
+    "git-commands: aviso: a pasta pedida não foi encontrada: $real" "$msg")" "$(cat "$SANDBOX/err")" "os avisos e, por último, o erro"
+}
+
+test_sem_conta_nao_busca_no_usuario() {
+  carrega_libs; export GIT_COMMANDS_GH=/nao/existe GIT_COMMANDS_OS=linux
+  make_repo_at "$HOME/Documents/a" teste >/dev/null
+  make_github_pair app >/dev/null
+  gc_config_set projects_dir "$SANDBOX/projetos"
+  # Sem login a busca no usuário fica desligada: só vale a pasta de projetos, mesmo com um projeto da conta na Documents.
+  assert_eq "$(reais "$SANDBOX/projetos/app")" "$(gc_all_repos)" "sem login"
+  # Com o login no config, ela liga.
+  gc_config_set github_user teste
+  assert_eq "$(reais "$HOME/Documents/a" "$SANDBOX/projetos/app")" "$(gc_all_repos)" "com login"
+}
+
+test_lista_usa_o_login_do_gh() {
+  carrega_libs; make_gh_stub; export GIT_COMMANDS_GH="$SANDBOX/stub/gh" GIT_COMMANDS_OS=linux
+  make_repo_at "$HOME/Documents/a" teste >/dev/null
+  # Quem atualizou de uma versão antiga não tem github_user no config. Com o gh sem login, não há onde procurar.
+  STUB_GH_USER= gc_all_repos >/dev/null 2>&1; assert_eq "1" "$?" "gh sem login: código"
+  assert_eq "" "$(gc_config_get github_user)" "gh sem login: o config continua vazio"
+  # Com o gh logado, o login vira o github_user e a busca no usuário liga na primeira verificação.
+  assert_eq "$(reais "$HOME/Documents/a")" "$(STUB_GH_USER=teste gc_all_repos)" "gh logado"
+  assert_eq "teste" "$(gc_config_get github_user)" "gh logado: o login foi gravado"
+}
+
+test_lista_junta_as_grafias_da_mesma_pasta_so_no_windows() {
+  carrega_libs; export GIT_COMMANDS_GH=/nao/existe GIT_COMMANDS_OS=linux
+  local maiusculas="$SANDBOX/fora/LOJA" dois=
+  make_repo_at "$SANDBOX/fora/Loja/app" teste >/dev/null
+  # Onde o disco diferencia as letras (Linux), LOJA é outra pasta e ganha o seu repositório. Onde não diferencia (Windows e, em
+  # geral, o Mac), é a mesma pasta, escrita de outro jeito.
+  if [ ! -d "$maiusculas" ]; then make_repo_at "$maiusculas/app" teste >/dev/null; dois=1; fi
+  gc_cmd_folders add "$SANDBOX/fora/Loja" >/dev/null; gc_cmd_folders add "$maiusculas" >/dev/null
+  # No Windows as duas grafias são uma pasta só, e o repositório aparece uma vez.
+  assert_eq "1" "$(GIT_COMMANDS_OS=windows gc_all_repos | grep -c .)" "windows: uma linha"
+  # No Linux e no Mac as letras contam: outra grafia é outra pasta (só dá para ver com duas pastas de verdade).
+  [ -z "$dois" ] || assert_eq "2" "$(GIT_COMMANDS_OS=linux gc_all_repos | grep -c .)" "linux: uma linha para cada pasta"
+  return 0
+}
+
+test_ignorar_so_ignora_as_letras_no_windows() {
+  carrega_libs; export GIT_COMMANDS_GH=/nao/existe GIT_COMMANDS_OS=linux
+  make_repo_at "$SANDBOX/fora/Loja/app" teste >/dev/null
+  gc_cmd_folders add "$SANDBOX/fora" >/dev/null
+  # A pasta ignorada escrita em maiúsculas, direto no arquivo: no Linux a pasta LOJA nem existe.
+  printf '%s\n' "$(gc_real_dir "$SANDBOX/fora")/LOJA" > "$(gc_home)/ignored"
+  assert_eq "" "$(GIT_COMMANDS_OS=windows gc_all_repos)" "windows: a pasta ignorada vale com outra caixa"
+  assert_eq "$(reais "$SANDBOX/fora/Loja/app")" "$(GIT_COMMANDS_OS=linux gc_all_repos)" "linux: outra caixa é outra pasta"
+  assert_eq "$(reais "$SANDBOX/fora/Loja/app")" "$(GIT_COMMANDS_OS=mac gc_all_repos)" "mac: outra caixa é outra pasta"
+}
+
+test_lista_pasta_sem_permissao_vira_aviso() {
+  carrega_libs
+  [ "$(gc_os)" = windows ] && skip "no Windows o chmod não tira a leitura"
+  [ "$(id -u)" = 0 ] && skip "o root lê qualquer pasta"
+  export GIT_COMMANDS_GH=/nao/existe GIT_COMMANDS_OS=linux
+  local out rc
+  gc_config_set github_user teste
+  make_repo_at "$HOME/Documents/a" teste >/dev/null
+  make_repo_at "$SANDBOX/fora/b" outra-conta >/dev/null
+  mkdir -p "$SANDBOX/fechada/x"
+  # A pasta de projetos existe, mas não dá para ler; a pasta pedida dá. O chmod volta antes das conferências, para o sandbox poder ser apagado.
+  gc_config_set projects_dir "$SANDBOX/fechada"; gc_cmd_folders add "$SANDBOX/fora" >/dev/null
+  chmod 000 "$SANDBOX/fechada"
+  out=$(gc_all_repos 2>"$SANDBOX/err"); rc=$?
+  chmod 755 "$SANDBOX/fechada"
+  assert_eq "0" "$rc" "código"
+  assert_eq "$(reais "$HOME/Documents/a" "$SANDBOX/fora/b")" "$out" "as outras fontes seguem"
+  assert_eq "git-commands: aviso: sem permissão para ler a pasta: $SANDBOX/fechada" "$(cat "$SANDBOX/err")" "o aviso"
+}
