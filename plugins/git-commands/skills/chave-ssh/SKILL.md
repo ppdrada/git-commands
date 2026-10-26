@@ -53,7 +53,7 @@ Diga o que vai acontecer e espere o ok: `gh ssh-key add ~/.ssh/<chave>.pub --tit
 ## 7. Passar para SSH (espere o ok)
 
 - Daqui para a frente: `gh config set -h github.com git_protocol ssh`.
-- Projetos que já existem: o `ssh status` mostra quantos estão em HTTPS. Ofereça trocar, um por um ou todos: `git-commands ssh remote <pasta> ssh`, e confira com `git -C <pasta> ls-remote origin HEAD`.
+- Projetos que já existem: o `ssh status` só conta quantos estão em HTTPS (`projetos_https=`), em todos os projetos que a verificação automática confere. Para saber quais são, rode `git-commands updates scan --no-fetch` (a primeira coluna é a pasta de cada projeto) e veja o endereço de cada um com `git -C <pasta> config --get remote.origin.url`: os que começam com `https://github.com/` estão em HTTPS. Mostre a lista e ofereça trocar, um por um ou todos: `git-commands ssh remote <pasta> ssh`, e confira com `git -C <pasta> ls-remote origin HEAD`.
 - Para voltar: `git-commands ssh remote <pasta> https` e `gh config set -h github.com git_protocol https`.
 - A verificação automática continua buscando por HTTPS e não precisa da senha da chave.
 

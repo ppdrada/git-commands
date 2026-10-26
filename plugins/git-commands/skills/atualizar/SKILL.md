@@ -10,7 +10,8 @@ Leia `${CLAUDE_PLUGIN_ROOT}/reference/regras.md` antes de qualquer passo. Nada �
 ## 1. Ver o que há de novo [conceito: fetch]
 
 - Se a pessoa falou "deste projeto", ou se o aviso do git-commands citou um projeto: `git-commands updates scan --repo <pasta>`.
-- Senão: `git-commands updates scan`, que olha todos os projetos da pasta de projetos. Se a pasta não estiver configurada, use a skill `git-commands:configurar`.
+- Senão: `git-commands updates scan`, que olha os projetos da conta da pessoa na pasta do usuário, os da pasta de projetos e os das pastas que ela pediu (`git-commands folders list` mostra onde ele procura). Se terminar com o erro `não há onde procurar projetos`, use a skill `git-commands:configurar` (login no GitHub ou pasta de projetos) ou ofereça pedir uma pasta (skill `git-commands:verificacao-automatica`).
+- Linhas `git-commands: aviso: ...` no meio da saída não são erro: o scan seguiu com o que achou (uma pasta não foi encontrada, faltou permissão para lê-la ou a busca na pasta do usuário parou no meio). Conte o aviso em uma frase e, se a pessoa quiser resolver, siga a skill `git-commands:verificacao-automatica`.
 - Mostre só os projetos com estado `novidades`, `divergiu`, `ocupado` ou `erro`. `ocupado` quer dizer que o projeto ficou no meio de uma junção (merge) ou de um rebase: explique e ofereça terminar (resolver os conflitos como no passo 5) ou voltar ao estado de antes (`git merge --abort` ou `git rebase --abort`), com o ok. Para cada um com novidades, rode `git-commands updates detail <pasta>` e conte os commits novos (quem fez e o quê). Se nada mudou, diga isso em uma frase.
 
 ## 2. Perguntar, por projeto [conceito: pull]

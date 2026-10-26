@@ -171,7 +171,7 @@ README.md             verificação automática, pastas, painel, comandos, contr
        - as escondidas (nome começando com `.`);
        - `AppData` e `node_modules`;
        - no Mac (`gc_os` = `mac`), também `Library`, `Desktop`, `Documents` e `Downloads`.
-    2. Para cada uma, `find <pasta> -maxdepth 5 \( -name '.*' ! -name .git -o -name node_modules \) -prune -o -name .git -print -prune` (o `.git` de `~/a/b/c/d/projeto` fica na profundidade 5 contando de `~/a`). Tire o `/.git` do fim.
+    2. Para cada uma, `find <pasta> -maxdepth 5 \( -name '.*' ! -name .git -o -name node_modules \) -prune -o -type d -name .git -print -prune` (o `.git` de `~/a/b/c/d/projeto` fica na profundidade 5 contando de `~/a`; só conta o `.git` que é pasta, porque o de um worktree ou de um submódulo é um arquivo, e esses não são projetos à parte). Tire o `/.git` do fim.
     3. Mantenha só os que têm `gc_github_owner "$(git -C <repo> config --get remote.origin.url)"` igual ao login.
   - **Limite de tempo:** os passos 1 e 2 rodam juntos dentro de `gc_run_with_timeout`, com a saída num arquivo temporário. O limite é `${GIT_COMMANDS_SEARCH_SECS:-20}` segundos. Esse nome de variável só serve para os testes e não vai para o README.
 

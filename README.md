@@ -36,7 +36,7 @@ O Claude faz os comandos por você, explica cada conceito na primeira vez e pede
 - **Avisa quando os seus projetos têm novidades no GitHub** e pergunta antes de atualizar. Se der conflito, resolve junto com você.
 - **Ensina enquanto faz**: cada conceito é explicado uma vez só, na primeira vez que aparece. Depois disso, ele não repete, a não ser que você pergunte.
 - **Protege o seu trabalho**: comandos que podem apagar alguma coisa sempre pedem confirmação, e arquivos com cara de senha ou chave são barrados antes de ir para o GitHub.
-- **Verificação automática (opcional)**: procura novidades de tempos em tempos, mesmo com o Claude fechado, usando o agendador do próprio sistema.
+- **Verificação automática (opcional)**: procura novidades de tempos em tempos, mesmo com o Claude fechado, usando o agendador do próprio sistema. Ela acha sozinha os seus projetos do GitHub na pasta do usuário, sem você precisar guardar tudo num lugar só.
 
 ## Requisitos
 
@@ -76,7 +76,7 @@ claude plugin list
 
 ```text
 ❯ git-commands@git-commands
-  Version: 1.0.0
+  Version: 1.2.0
   Status: ✔ enabled
 ```
 
@@ -132,17 +132,20 @@ Tudo fica na pasta `~/.git-commands/`. Para usar outra, defina a variável `GIT_
 | `config` | as opções da tabela abaixo |
 | `learned` | os conceitos que o Claude já explicou para você |
 | `proactive-off` | os projetos em que você desligou o modo automático |
+| `folders` | as pastas que você pediu para a verificação automática olhar |
+| `ignored` | as pastas que você mandou a verificação automática ignorar |
 | `status.tsv`, `status.time` e `check.log` | o resultado da verificação automática |
 
 ### Opções
 
 | Chave | Padrão | Para que serve |
 |---|---|---|
-| `projects_dir` | (vazio) | a pasta dos seus projetos; a verificação automática olha aqui |
+| `projects_dir` | (vazio) | a pasta onde nascem os projetos novos e para onde vão os que você baixa; a verificação automática também olha aqui |
 | `auto_check` | `off` | se a verificação automática está ligada (use `schedule enable` e `disable`) |
 | `interval` | `30` | minutos entre as verificações, de 5 a 1440 |
 | `proactive` | `on` | o modo automático em todos os projetos (regras ao abrir o Claude e checagem antes de editar) |
 | `auto_check_asked` | (vazio) | se o plugin já perguntou sobre a verificação automática |
+| `github_user` | (vazio) | o seu login do GitHub, preenchido sozinho; é com ele que a verificação acha os seus projetos na pasta do usuário |
 
 ```bash
 git-commands config list                    # mostra todas as opções
@@ -166,7 +169,47 @@ git-commands schedule disable     # desliga
 
 A verificação só lê (`git fetch`), nunca muda os seus arquivos e nunca abre janela de senha. Quando você abre o Claude, ele conta quais projetos têm novidades e avisa se a verificação deu erro ou parou de rodar.
 
-> **No macOS**, guarde os projetos fora de Documentos, Mesa e Downloads (por exemplo, em `~/git`): o sistema não deixa tarefas em segundo plano lerem essas pastas.
+#### Onde ela procura os projetos
+
+Você não precisa guardar tudo numa pasta só. A verificação junta três lugares, sem repetir nenhum projeto:
+
+1. **A pasta do usuário, inteira:** `C:\Users\<você>` no Windows, `/Users/<você>` no macOS e `/home/<você>` no Linux. Só entram os projetos da **sua conta do GitHub**: o endereço do projeto no GitHub (o `origin`) tem que ser seu, e o plugin descobre o seu login sozinho, pelo login do `gh`. A busca desce até **5 níveis** de pastas: um projeto em `<pasta do usuário>/a/b/c/d/projeto` entra, mais fundo não.
+2. **A pasta de projetos** (a opção `projects_dir`): entram todos os repositórios do GitHub que estão nela, de qualquer dono, até 2 níveis.
+3. **As pastas que você pedir** (veja abaixo): a mesma regra da pasta de projetos, esteja a pasta onde estiver.
+
+Na pasta do usuário, a busca **pula** as pastas escondidas (o nome começa com `.`, como `.claude`), a `AppData` e as `node_modules`. Ela nunca sai da pasta do usuário: outro disco, ou a `C:\` inteira, só entra se você pedir a pasta. Sem login no GitHub, essa busca fica desligada, e valem só a pasta de projetos e as pastas pedidas. Projetos de uma organização ou de outra pessoa (o `origin` não é seu) não são achados sozinhos: deixe-os na pasta de projetos ou peça a pasta deles.
+
+A busca só lista pastas e lê o `origin` de cada projeto: não usa a internet e não lê os seus arquivos. Ela tem um limite de tempo (20 segundos): se a sua pasta for enorme, ela para no meio, e a verificação segue com o que achou.
+
+> **No macOS**, a busca na pasta do usuário também pula a `Library` e as pastas Documentos, Mesa e Downloads (`Documents`, `Desktop` e `Downloads` no disco): o sistema não deixa tarefas em segundo plano lerem essas pastas. Um projeto que está numa delas só entra se você pedir a pasta (`git-commands folders add ~/Documents/site`) ou se ela for a pasta de projetos. Aí foi você que escolheu, e o macOS pode pedir a sua permissão; sem ela, a verificação avisa "sem permissão" e pula a pasta. O mais simples é guardar os projetos fora delas, por exemplo em `~/git`.
+
+#### Pedir, tirar e ignorar pastas
+
+Diga ao Claude ("monitora também a pasta D:/projetos", "ignora a pasta site-antigo", "onde você procura meus projetos?") ou rode os comandos:
+
+```bash
+git-commands folders add D:/projetos                   # passa a verificar também esta pasta
+git-commands folders remove D:/projetos                # deixa de verificar
+git-commands folders ignore ~/Documents/site-antigo    # esconde uma pasta que a busca acha sozinha
+git-commands folders unignore ~/Documents/site-antigo  # volta a mostrar
+git-commands folders list                              # mostra onde ela procura
+```
+
+- **Pedir** serve para o que a busca não alcança sozinha: outro disco (`D:/projetos`), uma pasta `C:/git`, projetos de uma organização.
+- **Ignorar** serve para o que a busca acha, mas você não quer ver: uma cópia velha ou de backup de um projeto (como `site - Cópia`) ou um projeto antigo esquecido em Downloads. Vale para tudo o que está dentro da pasta ignorada, nos três lugares.
+- No Windows, escreva o caminho com `/` (como `D:/projetos`) ou entre aspas. Nome de pasta com espaço também vai entre aspas. A pasta precisa existir na hora de pedir ou ignorar.
+- Se uma pasta pedida some depois (apagada, disco externo desligado), a verificação escreve um aviso no `~/.git-commands/check.log`, pula essa pasta e segue com as outras.
+
+O `git-commands folders list` mostra uma linha por lugar: o tipo, a pasta e a situação.
+
+```text
+usuario   C:/Users/voce                        ok
+projetos  C:/Users/voce/git                    ok
+pedida    D:/projetos                          nao-encontrada
+ignorada  C:/Users/voce/Documents/site-antigo  ok
+```
+
+A primeira linha é a pasta do usuário (`desligada` se faltar o login no GitHub), e a segunda é a pasta de projetos (`nao-configurada` se ela estiver vazia). Depois vêm uma linha para cada pasta pedida e uma para cada pasta ignorada. `nao-encontrada` quer dizer que a pasta sumiu do disco: para tirá-la da lista, escreva o caminho exatamente como o `list` mostra.
 
 ### Modo automático por projeto
 
@@ -209,7 +252,7 @@ O padrão é o login pelo navegador (HTTPS), que já é seguro. Se você preferi
 5. **Os projetos passam para SSH**, com o seu ok, um por um ou todos.
 
 ```bash
-git-commands ssh status                  # chave, agente, configuração e projetos em HTTPS e em SSH
+git-commands ssh status                  # chave, agente, configuração e quantos projetos estão em HTTPS e em SSH
 git-commands ssh test                    # testa a chave com o GitHub
 git-commands ssh remote ~/git/site https # volta um projeto para HTTPS
 ```
@@ -223,9 +266,11 @@ O `git-commands-painel` é um plugin à parte que mostra o estado dos seus proje
 - **Na linha de status**, embaixo da caixa de mensagem: "git-commands: 2 com novidades", "git-commands: em dia" ou "git-commands: verificação parada".
 - **Uma faixa acima da caixa de mensagem**, só quando há novidades, com os botões **Ver agora** (pergunta ao Claude "tem algo novo nos meus projetos?") e **Depois** (esconde a faixa até a lista mudar).
 - **Um aviso rápido** quando uma verificação nova traz novidades.
-- **O comando `/painel`**, que abre ao lado da conversa a lista dos projetos com o estado de cada um.
+- **O comando `/painel`**, que abre ao lado da conversa a lista dos projetos, cada um com a pasta onde está (em cinza), o nome, a branch e o estado.
 
-Ele só lê o que a [verificação automática](#verificação-automática) grava em `~/.git-commands`: não usa a internet, não roda git e nunca atualiza nada. Por isso, ligue a verificação automática antes. Para instalar, no terminal:
+A pasta é contada a partir da pasta do usuário: por exemplo, `Documents\` em cinza e depois `site (main): com novidades (3)` na cor do estado (no Windows, ela aparece com o nome que tem no disco, mesmo que o Explorador mostre "Documentos"). Um projeto direto na pasta do usuário aparece sem pasta, e um que está fora dela mostra a pasta inteira (como `D:\projetos\`). Assim dá para diferenciar duas cópias do mesmo projeto.
+
+O painel só lê o que a [verificação automática](#verificação-automática) grava em `~/.git-commands`: não usa a internet, não roda git e nunca atualiza nada. Por isso, ligue a verificação automática antes. Para instalar, no terminal:
 
 ```bash
 claude plugin install git-commands-painel@git-commands
@@ -242,6 +287,7 @@ As skills usam o executável `git-commands`, que o Claude Code coloca no termina
 | `git-commands doctor` | diz o que falta no computador (git, `gh`, login, nome e e-mail, pasta de projetos) |
 | `git-commands config get\|set\|list` | lê e muda as opções |
 | `git-commands schedule enable [minutos]\|disable\|status` | liga, desliga e mostra a verificação automática |
+| `git-commands folders add\|remove\|ignore\|unignore\|list` | pede, tira e ignora pastas na verificação automática, e mostra onde ela procura |
 | `git-commands proactive on\|off [--all]\|status` | liga e desliga o modo automático |
 | `git-commands learned list\|has\|add\|forget\|reset` | os conceitos já explicados |
 | `git-commands updates scan\|news\|detail\|pull` | procura novidades, mostra as diferenças e atualiza com segurança |
@@ -262,12 +308,18 @@ gh_user=seu-usuario
 user_name=Seu Nome
 user_email=12345678+seu-usuario@users.noreply.github.com
 projects_dir=C:/Users/voce/git
+github_user=seu-usuario
+folders=0
+folders_missing=0
+ignored=0
 auto_check=on
 interval=30
 proactive=on
 ssh_key=
 git_protocol=https
 ```
+
+`github_user` é o login que a busca na pasta do usuário usa (o `doctor` grava sozinho), `folders` conta as pastas pedidas, `folders_missing` quantas delas já não existem e `ignored` quantas pastas estão ignoradas.
 
 ## Segurança
 
@@ -300,9 +352,24 @@ gh auth refresh -h github.com -s workflow
 
 Peça "confere a verificação automática". Os casos mais comuns:
 
-- **macOS, "sem permissão para ler a pasta de projetos":** a pasta está em Documentos, Mesa ou Downloads. Mova os projetos para `~/git` e rode `git-commands config set projects_dir ~/git`.
+- **"não há onde procurar projetos":** a verificação não tem nenhum lugar para olhar: falta o login no GitHub, e também não há pasta de projetos nem pasta pedida que exista. Peça "configura o git e o GitHub" para fazer o login ou escolher a pasta de projetos, ou peça uma pasta com `git-commands folders add <pasta>`.
 - **Agendamento desligado ou parado:** `git-commands schedule enable 30` recria o agendamento.
 - **Linux (WSL), mesmo ligado:** o serviço do cron pode estar desligado. Rode `sudo service cron start`.
+</details>
+
+<details>
+<summary><b>Um projeto meu não aparece no painel nem nos avisos</b></summary>
+
+Rode `git-commands folders list` (ou peça "onde você procura meus projetos?") e confira:
+
+- **O projeto está numa pasta ignorada** (linha `ignorada`)? Rode `git-commands folders unignore <pasta>`.
+- **A busca na pasta do usuário não alcança o projeto:** o `origin` não é da sua conta (organização, outra pessoa), ele está fundo demais (mais de 5 níveis), numa pasta escondida, na `AppData` ou numa `node_modules`, ou fora da pasta do usuário (outro disco, `C:/git`). Peça a pasta dele: `git-commands folders add <pasta>` (pode ser a própria pasta do projeto ou uma que a contém, até 2 níveis acima).
+- **Só entram projetos do GitHub.** Um projeto que ainda não está ligado ao GitHub, ou que está em outro serviço, não aparece.
+- **Aviso "a pasta de projetos não foi encontrada" ou "a pasta pedida não foi encontrada":** a pasta foi apagada, renomeada ou está num disco desligado. A verificação pula a pasta e segue com as outras. Se ela não volta mais, tire-a da lista com `git-commands folders remove <pasta>` (com o caminho exatamente como o `folders list` mostra) ou escolha a pasta de projetos de novo.
+- **macOS, aviso "sem permissão para ler a pasta":** a pasta está em Documentos, Mesa ou Downloads, e o sistema não deixa tarefas em segundo plano lerem essas pastas. Mova os projetos para `~/git` e, se era a pasta de projetos, rode `git-commands config set projects_dir ~/git`.
+- **Aviso "a busca na pasta do usuário passou de 20 segundos e parou no meio":** a pasta do usuário é grande, ou o disco está lento. Os projetos que a busca não alcançou não aparecem. Peça a pasta deles com `git-commands folders add <pasta>`.
+
+Os avisos ficam no fim de `~/.git-commands/check.log`. A verificação continua funcionando com o que achou.
 </details>
 
 <details>
@@ -364,7 +431,8 @@ plugins/git-commands/
   agents/git.md                  ajudante que resume as novidades dos repositórios (só lê)
   hooks/                         session-start, guard e pre-edit (pelo run-hook.cmd)
   bin/git-commands               o executável que as skills usam
-  lib/                           o código, em bash compatível com o 3.2 do macOS
+  lib/                           o código, em bash compatível com o 3.2 do macOS; o folders.sh
+                                 monta a lista de projetos (pasta do usuário, de projetos e pedidas)
   scheduler/                     o que o agendador do sistema roda
   reference/                     regras, glossário de conceitos e modelos de .gitignore
   evals/                         avaliações de comportamento das skills
