@@ -144,7 +144,8 @@ test('atualiza a cada minuto', async ($, on) => {
   expect(m.status.at(-1)).toBe('git-commands: em dia')
 })
 
-test('a verificação só fica parada depois de 5 minutos atrasada', async ($, on) => {
+// Depois de acordar, o agendador do macOS e o do Linux só rodam no próximo intervalo.
+test('a verificação só fica parada depois de um intervalo e 5 minutos atrasada', async ($, on) => {
   const relogio = mock.clock(on, { now: AGORA })
   mock.env(on, { HOME: '/casa' })
   const m = mundo(on, arquivos({ 'status.tsv': EM_DIA, 'status.time': segundos(AGORA - 4 * HORA) }))
@@ -152,7 +153,7 @@ test('a verificação só fica parada depois de 5 minutos atrasada', async ($, o
   await abrir($)
   expect(m.status.at(-1)).toBe('git-commands: esperando a verificação')
 
-  await relogio.advance(4 * MINUTO)
+  await relogio.advance(34 * MINUTO)
   expect(m.status.at(-1)).toBe('git-commands: esperando a verificação')
 
   await relogio.advance(MINUTO)
@@ -370,4 +371,20 @@ test('quando não dá para abrir, o comando diz isso', async ($, on) => {
   await abrir($)
 
   expect(await $.command.run(PAINEL_PEDIDO)).toEqual({ text: 'Não deu para abrir o painel aqui.' })
+})
+
+test('a faixa continua enquanto espera a verificação e some quando ela para', async ($, on) => {
+  const relogio = mock.clock(on, { now: AGORA })
+  mock.env(on, { HOME: '/casa' })
+  const m = mundo(on, arquivos({ 'status.tsv': DUAS_NOVIDADES, 'status.time': segundos(AGORA - 4 * HORA) }))
+  await abrir($)
+
+  expect(m.status.at(-1)).toBe('git-commands: 2 com novidades')
+  const ui = await $.ui.mount({ ...FAIXA, surface: 'desktop' })
+  expect((await ui.find({ type: 'Text', text: /Novidades/ }))?.text).toBe('Novidades no GitHub: site (3), api (1)')
+
+  await relogio.advance(35 * MINUTO)
+  expect(m.status.at(-1)).toBe('git-commands: verificação parada')
+  expect(await ui.find({ type: 'Text', text: /Novidades/ })).toBeUndefined()
+  await ui.unmount()
 })

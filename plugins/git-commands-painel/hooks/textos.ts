@@ -17,13 +17,13 @@ export function linhaDeStatus(resumo: Resumo): string {
       return 'git-commands: verificação desligada'
     case 'erro':
       return 'git-commands: verificação com erro'
-    case 'esperando':
-      return 'git-commands: esperando a verificação'
     case 'parada':
       return 'git-commands: verificação parada'
   }
+  // Esperando a verificação, as novidades da última continuam valendo (o Claude também conta delas).
   const novidades = comNovidades(resumo.projetos).length
   if (novidades > 0) return `git-commands: ${novidades} com novidades`
+  if (resumo.situacao === 'esperando') return 'git-commands: esperando a verificação'
   // Sem internet, todos ficam com erro: não dá para dizer que estão em dia.
   const erros = resumo.projetos.filter(p => p.estado === 'erro').length
   if (erros > 0) return `git-commands: ${erros} com erro`

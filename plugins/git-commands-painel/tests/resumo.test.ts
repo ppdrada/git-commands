@@ -69,8 +69,12 @@ test('resumir: desligada, erro, esperando, parada e ok', () => {
   expect(comErro.situacao).toBe('erro')
   expect(comErro.motivo).toBe('sem permissão')
 
-  expect(resumir(arquivos(), AGORA, AGORA - MINUTO).situacao).toBe('esperando')
-  expect(resumir(arquivos(), AGORA, AGORA - 5 * MINUTO).situacao).toBe('parada')
+  // O agendador do macOS e o do Linux não rodam o que perderam dormindo: a folga é 1 intervalo + 5 min.
+  expect(resumir(arquivos(), AGORA, AGORA - 34 * MINUTO).situacao).toBe('esperando')
+  expect(resumir(arquivos(), AGORA, AGORA - 35 * MINUTO).situacao).toBe('parada')
+  const deHoraEmHora = arquivos({ config: 'auto_check=on\ninterval=60\n' })
+  expect(resumir(deHoraEmHora, AGORA, AGORA - 64 * MINUTO).situacao).toBe('esperando')
+  expect(resumir(deHoraEmHora, AGORA, AGORA - 65 * MINUTO).situacao).toBe('parada')
   expect(resumir(arquivos({ tsv: undefined }), AGORA, null).situacao).toBe('esperando')
 
   const ok = resumir(arquivos(), AGORA, null)

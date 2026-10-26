@@ -47,6 +47,18 @@ test('linha de status para cada situação', () => {
   )
 })
 
+test('enquanto espera a verificação, as novidades continuam na linha de status', () => {
+  expect(linhaDeStatus(resumo({ situacao: 'esperando', projetos: [projeto('site', 'novidades', 3)] }))).toBe(
+    'git-commands: 1 com novidades',
+  )
+  expect(linhaDeStatus(resumo({ situacao: 'esperando', projetos: [projeto('site', 'em-dia')] }))).toBe(
+    'git-commands: esperando a verificação',
+  )
+  expect(linhaDeStatus(resumo({ situacao: 'parada', projetos: [projeto('site', 'novidades', 3)] }))).toBe(
+    'git-commands: verificação parada',
+  )
+})
+
 test('projetos com erro não aparecem como em dia', () => {
   expect(linhaDeStatus(resumo({ projetos: [projeto('site', 'erro'), projeto('api', 'erro')] }))).toBe(
     'git-commands: 2 com erro',

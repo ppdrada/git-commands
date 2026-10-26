@@ -101,7 +101,8 @@ export const register: Register = on => {
   // A faixa acima da caixa de mensagem: só com novidades, e some até a lista mudar.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const atual = await read($, resumo)
-    if (e.props.hasSurvey || atual === null || atual.situacao !== 'ok') return next(e)
+    const valeMostrar = atual?.situacao === 'ok' || atual?.situacao === 'esperando'
+    if (e.props.hasSurvey || atual === null || !valeMostrar) return next(e)
     const lista = assinatura(atual.projetos)
     if (lista === '' || (await read($, escondida)) === lista) return next(e)
 

@@ -2,7 +2,11 @@
 // Só funções puras: quem lê do disco é o register.tsx.
 import type { Projeto, Resumo, Situacao } from '../types'
 
-/** Quanto tempo a verificação pode ficar atrasada antes de virar "parada" (o computador pode ter acabado de acordar). */
+/**
+ * Atrasada há pouco pode ser o computador que acabou de acordar: o agendador do macOS e o do Linux
+ * não rodam o que perderam dormindo, só o próximo intervalo. A verificação vira "parada" depois de
+ * 1 intervalo mais esta folga, o tempo de ela rodar.
+ */
 export const GRACA_MS = 300_000
 export const INTERVALO_PADRAO = 30
 
@@ -79,7 +83,7 @@ export function resumir(arquivos: Arquivos, agora: number, paradaDesde: number |
   let situacao: Situacao = 'ok'
   if (!ligada) situacao = 'desligada'
   else if (motivo !== null) situacao = 'erro'
-  else if (paradaDesde !== null) situacao = agora - paradaDesde >= GRACA_MS ? 'parada' : 'esperando'
+  else if (paradaDesde !== null) situacao = agora - paradaDesde >= intervalo * MINUTO + GRACA_MS ? 'parada' : 'esperando'
   else if (arquivos.tsv === undefined) situacao = 'esperando'
   return {
     situacao,
