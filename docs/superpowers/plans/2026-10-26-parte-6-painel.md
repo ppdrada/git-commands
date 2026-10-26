@@ -25,7 +25,7 @@
 
 ## Review Focus
 
-1. **Computador acordando depois de dormir** (o `status.time` fica velho até o agendador rodar de novo): o esperado é "esperando a verificação" por até 5 minutos, nunca "verificação parada" logo de cara. Teste: `a verificação só fica parada depois de 5 minutos atrasada` (Tarefa 3).
+1. **Computador acordando depois de dormir** (o `status.time` fica velho até o agendador rodar de novo; o do macOS e o do Linux só rodam no próximo intervalo): o esperado é "esperando a verificação" por até 1 intervalo mais 5 minutos, com as novidades da última verificação ainda à mostra, nunca "verificação parada" logo de cara. Teste: `a verificação só fica parada depois de um intervalo e 5 minutos atrasada` (Tarefa 3; corrigido na revisão final, veja no fim).
 2. **Windows sem `HOME`** (só `USERPROFILE`): o esperado é achar `C:\Users\<pessoa>\.git-commands`. Teste: `lê a pasta do GIT_COMMANDS_HOME, do HOME ou do USERPROFILE` (Tarefa 3).
 3. **git-commands nunca configurado** (sem a pasta): o esperado é "git-commands: verificação desligada" e o painel explicar como ligar, sem erro nenhum. Testes: `sem a pasta do git-commands, a verificação está desligada` (Tarefa 1) e `o painel explica quando a verificação está desligada` (Tarefa 5).
 4. **Sem internet na última verificação** (todos os projetos com `erro`): o esperado é "git-commands: 2 com erro", nunca "em dia". Teste: `projetos com erro não aparecem como em dia` (Tarefa 2).
@@ -418,3 +418,12 @@ git commit -m "Depois de atualizar um projeto, a linha dele no status.tsv já fi
 - [ ] **Step 1: Verificar tudo**: `bash tests/run.sh`, `claude plugin test plugins/git-commands-painel` e os três `claude plugin validate ... --strict`. Opcional, local: conferir os tipos com o TypeScript do npm (`npx -y -p typescript@5.6.3 tsc -p <tsconfig no scratchpad>`, com o arquivo de tipos da skill), sem que nada disso entre no projeto.
 - [ ] **Step 2: Revisão** da branch inteira por um revisor novo (`superpowers:requesting-code-review`), e correção do que ele achar.
 - [ ] **Step 3: Publicação**, cada passo com o ok do Dev: `git push -u origin parte-6-painel`, o PR (título e descrição mostrados antes, com o link), a junção e as marcas de versão (`git-commands-painel--v0.1.0` e, com a Tarefa 7, `git-commands--v1.1.1`).
+
+## Depois da revisão final
+
+A revisão da branch inteira trouxe estas mudanças, já feitas e testadas:
+
+- **Folga depois de acordar:** "parada" só depois de 1 intervalo mais 5 minutos de atraso (`intervalo * 60_000 + GRACA_MS`), porque o agendador do macOS (launchd) e o do Linux (cron) não rodam a verificação que perderam enquanto o computador dormia. Enquanto espera, as novidades da última verificação continuam na linha de status e na faixa.
+- **Faixa escondida:** o `$.state` guarda `escondidas: string[]` (cada novidade como `caminho:commits`) no lugar de `escondida`, e `entradas`, `temNovidadeAMostrar` e `podarEscondidas` substituem `assinatura`. A faixa volta só quando chega uma novidade que ainda não foi escondida: um projeto que sai da lista não a traz de volta, e o que sai da lista é esquecido.
+- **Primeira verificação:** sem `status.tsv`, `verificadoEm` é `null`. O painel diz "Esperando a primeira verificação." e não diz "Nenhum projeto do GitHub na pasta de projetos.".
+- **Registro do /painel:** a linha de status e o relógio começam antes do registro do comando; se o registro for recusado, o resto continua.
