@@ -62,3 +62,16 @@ test_ss_apaga_marcadores_de_sessao_antigos() {
 }
 
 test_ss_cwd_com_barras_invertidas() { local r; r=$(make_github_pair app); [ "$(gc os)" = windows ] || skip "só no Windows"; assert_contains "$(ss "$(native_path "$r" | sed 's#/#\\\\#g')")" "(app)" ""; }
+
+ss_src() { printf '{"cwd":"%s","source":"%s"}' "$1" "$2" | CLAUDE_PLUGIN_ROOT="$PLUGIN" "$BASH" "$PLUGIN/hooks/run-hook.cmd" session-start; }
+
+test_ss_avisos_so_ao_abrir_ou_limpar() {
+  gc config set projects_dir "$SANDBOX/projetos"; local a; a=$(make_github_pair app); push_remote_commit app n.txt "um"
+  gc updates scan --save >/dev/null; gc config set auto_check on
+  printf '%s\n' '2026-10-25 18:00:00 erro 1' >> "$(gc home)/check.log"
+  assert_contains "$(ss_src "$SANDBOX" startup)" "Novidades no GitHub" "startup"
+  assert_contains "$(ss_src "$SANDBOX" clear)" "deu erro" "clear"
+  assert_not_contains "$(ss_src "$SANDBOX" compact)" "Novidades" "compact"
+  assert_not_contains "$(ss_src "$SANDBOX" resume)" "deu erro" "resume"
+  assert_contains "$(ss_src "$a" compact)" "git-commands está ativo" "as regras voltam depois de resumir"
+}

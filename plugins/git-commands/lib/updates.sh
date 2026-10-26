@@ -21,14 +21,14 @@ gc_updates_repos() {
 
 gc_updates_fetch() {
   gc_quiet_net
-  gc_run_with_timeout 20 git -C "$1" fetch --prune --quiet >/dev/null 2>&1
+  gc_fetch_origin "$1" 20 >/dev/null 2>&1
 }
 
 # Uma linha: caminho, nome, branch, ahead, behind, alterados, estado.
 gc_updates_line() {
   local r=$1 fetch=$2 name branch ahead=0 behind=0 dirty state="" counts
   name=${r##*/}
-  dirty=$(git -C "$r" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+  dirty=$(GIT_OPTIONAL_LOCKS=0 git -C "$r" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
   branch=$(git -C "$r" symbolic-ref --short -q HEAD 2>/dev/null) || branch=""
   if ! git -C "$r" rev-parse -q --verify HEAD >/dev/null 2>&1; then
     state=sem-commits
@@ -133,10 +133,15 @@ gc_updates_detail() {
 }
 
 # Atualiza só por fast-forward e só quando é seguro.
-# Códigos: 0 ok; 3 alterações sem commit; 4 divergiu; 5 sem upstream; 6 erro de rede.
+# Códigos: 0 ok; 3 alterações sem commit; 4 divergiu; 5 sem upstream; 6 erro de rede;
+# 7 HEAD destacado. Uma ida à rede só (o fetch com limite); depois junta o que já chegou.
 gc_updates_pull() {
-  local r counts ahead behind mod out
+  local r counts ahead behind mod out soltos
   r=$(gc_toplevel "${1:-.}") || { printf 'git-commands: não é um repositório git: %s\n' "${1:-.}" >&2; return 1; }
+  # HEAD destacado: conta os commits que não estão em nenhuma branch, que se perderiam ao trocar.
+  git -C "$r" symbolic-ref -q HEAD >/dev/null 2>&1 || {
+    soltos=$(git -C "$r" rev-list --count HEAD --not --branches --remotes 2>/dev/null) || soltos=0
+    printf 'HEAD destacado: o projeto não está em nenhuma branch (%s commit(s) soltos)\n' "$soltos"; return 7; }
   git -C "$r" rev-parse -q --verify '@{u}' >/dev/null 2>&1 || {
     printf 'sem upstream: a branch %s ainda não existe no GitHub\n' "$(git -C "$r" symbolic-ref --short -q HEAD)"; return 5; }
   gc_updates_fetch "$r" || { printf 'erro de rede: não consegui falar com o GitHub\n'; return 6; }
@@ -146,7 +151,7 @@ gc_updates_pull() {
   mod=$(git -C "$r" status --porcelain --untracked-files=no)
   [ -z "$mod" ] || { printf 'há alterações sem commit:\n%s\n' "$mod"; return 3; }
   [ "$ahead" -eq 0 ] || { printf 'divergiu: %s commit(s) seus e %s do GitHub\n' "$ahead" "$behind"; return 4; }
-  out=$(LC_ALL=C git -C "$r" pull --ff-only --quiet 2>&1) || {
+  out=$(LC_ALL=C git -C "$r" merge --ff-only --quiet '@{u}' 2>&1) || {
     case "$out" in
       *overwritten*) printf 'há arquivos que seriam sobrescritos:\n%s\n' "$out"; return 3 ;;
       *) printf 'erro: %s\n' "$out"; return 6 ;;

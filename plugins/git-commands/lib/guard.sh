@@ -10,6 +10,8 @@ GC_GUARD_LIMPEZA="apaga arquivos que o git não acompanha"
 GC_GUARD_REESCRITA="reescreve o histórico de commits"
 GC_GUARD_STASH="apaga alterações guardadas no stash"
 GC_GUARD_REPO="apaga o repositório no GitHub"
+GC_GUARD_CHAVE="apaga uma chave SSH no GitHub"
+GC_GUARD_CHAVE_POR_CIMA="sobrescreve uma chave SSH que já existe"
 
 GC_GUARD_SEP=$'\036'
 GC_GUARD_CWD=.
@@ -141,7 +143,7 @@ gc_guard_git() {
         esac
       done ;;
     rebase)
-      for t; do [ "$t" = --continue ] && return 1; done
+      for t; do [ "$t" = --continue ] || [ "$t" = --abort ] && return 1; done
       gc_guard_say "$GC_GUARD_REESCRITA"; return ;;
     pull)
       for t; do
@@ -169,6 +171,7 @@ gc_guard_gh() {
   local t
   case "${1:-} ${2:-}" in
     "repo delete") gc_guard_say "$GC_GUARD_REPO"; return ;;
+    "ssh-key delete") gc_guard_say "$GC_GUARD_CHAVE"; return ;;
     "pr merge"|"pr close")
       for t; do
         case "$t" in --delete-branch|-d) gc_guard_say "$GC_GUARD_BRANCH"; return ;; esac
@@ -179,6 +182,34 @@ gc_guard_gh() {
 
 # Um comando (sem separadores): pula o que vem antes do programa e olha se é git, gh ou um
 # shell que roda outro comando (bash -c, powershell -Command, cmd /c).
+# ssh-keygen que geraria uma chave num arquivo que já existe (sem -f, o padrão ~/.ssh/id_<tipo>).
+# Opções que só leem ou mexem em outra coisa (-l, -y, -F...) não geram chave.
+gc_guard_sshkeygen() {
+  local tipo=ed25519 alvo="" bs='\'
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -[lyFRHYLQkeipcDs]*) return 1 ;;
+      -t) shift; [ $# -gt 0 ] && tipo=$1 ;;
+      -t*) tipo=${1#-t} ;;
+      -f) shift; [ $# -gt 0 ] && alvo=$1 ;;
+      -f*) alvo=${1#-f} ;;
+    esac
+    [ $# -gt 0 ] && shift
+  done
+  [ -n "$alvo" ] || alvo="$HOME/.ssh/id_$tipo"
+  case "$alvo" in
+    '~/'*|'~'"$bs"*) alvo="$HOME/${alvo#??}" ;;
+    '$HOME/'*|'$HOME'"$bs"*) alvo="$HOME/${alvo#?????[/\\]}" ;;
+    '${HOME}/'*|'${HOME}'"$bs"*) alvo="$HOME/${alvo#???????[/\\]}" ;;
+    '$env:USERPROFILE'*|'%USERPROFILE%'*) alvo="$HOME/${alvo#*[/\\]}" ;;
+    /*|[A-Za-z]:*) ;;
+    *) alvo="$GC_GUARD_CWD/$alvo" ;;
+  esac
+  alvo=${alvo//"$bs"//}
+  [ -e "$alvo" ] || return 1
+  gc_guard_say "$GC_GUARD_CHAVE_POR_CIMA"
+}
+
 gc_guard_segment() {
   local depth=$1 base
   shift
@@ -207,6 +238,7 @@ gc_guard_segment() {
   case "$base" in
     [Gg][Ii][Tt]|[Gg][Ii][Tt].[Ee][Xx][Ee]) gc_guard_git "$@"; return ;;
     [Gg][Hh]|[Gg][Hh].[Ee][Xx][Ee]) gc_guard_gh "$@"; return ;;
+    ssh-keygen|ssh-keygen.exe) gc_guard_sshkeygen "$@"; return ;;
     bash|sh|zsh|dash|bash.exe|sh.exe|[Pp]ower[Ss]hell|[Pp]ower[Ss]hell.exe|pwsh|pwsh.exe|cmd|cmd.exe)
       [ "$depth" -lt 2 ] || return 1
       while [ $# -gt 0 ]; do
@@ -238,7 +270,7 @@ gc_guard_scan() {
 gc_guard_reason() {
   local cmd=$1 rest line
   GC_GUARD_CWD=${2:-$PWD}
-  case "$cmd" in *[Gg][Ii][Tt]*|*[Gg][Hh]*) ;; *) return 1 ;; esac
+  case "$cmd" in *[Gg][Ii][Tt]*|*[Gg][Hh]*|*[Ss][Ss][Hh]-[Kk][Ee][Yy][Gg][Ee][Nn]*) ;; *) return 1 ;; esac
   gc_guard_scan "$cmd" 0 && return 0
   # Um apóstrofo no texto de um heredoc engana a leitura das aspas; então também
   # confere cada linha sozinha.

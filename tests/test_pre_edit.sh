@@ -34,3 +34,9 @@ test_pre_edit_caminho_windows() {
   [ "$(gc os)" = windows ] || skip "só no Windows"; local a; a=$(make_github_pair app); push_remote_commit app n.txt "um"
   assert_contains "$(pe s3 "$(native_path "$a" | sed 's#/#\\\\#g')\\\\README.md")" "deny" ""
 }
+
+test_pre_edit_projeto_ssh() {
+  local a; a=$(make_github_pair app); git -C "$a" remote set-url origin git@github.com:teste/app.git
+  push_remote_commit app n.txt "um"
+  assert_contains "$(GIT_SSH_COMMAND=false pe s7 "$a/README.md")" "o projeto app tem 1 novidade(s)" ""
+}

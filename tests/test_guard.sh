@@ -22,12 +22,12 @@ test_guard_tabela() {
     'Get-ChildItem | ForEach-Object { git -C $_.FullName reset --hard }|descarta'
     "git checkout app.js|descarta" "git checkout HEAD src/app.js|descarta"
     "git switch -C x|apaga uma branch" "git checkout -B x|apaga uma branch"
-    "gh pr close 3 --delete-branch|apaga uma branch" "git push --prune origin|apaga uma branch"
+    "gh pr close 3 --delete-branch|apaga uma branch" "gh ssh-key delete 123 --yes|chave SSH" "git push --prune origin|apaga uma branch"
     "git branch -M velho novo|apaga uma branch" "git rm -f app.js|descarta"
     "$(printf 'cat > notas.txt <<EOF\nIt'"'"'s fine\nEOF\ngit push --force')|força")
   local seguros=("git status" "git push" "git push -u origin feature" "git pull --ff-only" "git checkout -b nova"
     "git switch -c nova" "git checkout main" "git restore --staged app.js" 'git commit -m "reset --hard explicado"'
-    "git rebase --continue" "git stash" "git stash pop" "git branch" "git branch -m velho novo" "ls -la"
+    "git rebase --continue" "git rebase --abort" "git stash" "git stash pop" "git branch" "git branch -m velho novo" "ls -la"
     "echo git push --force" "gh pr create --title x" "gh pr merge 3 --merge"
     "git push origin main:main" 'git commit -m "a && git reset --hard"'
     "git checkout -b nova origin/nova" "git rm --cached .env" "git log --oneline | head -5")
@@ -59,4 +59,14 @@ test_guard_hook_usa_a_pasta_do_comando() {
 test_guard_hook_silencioso_em_comando_seguro() {
   local out; out=$(printf '%s' '{"tool_input":{"command":"git status"}}' | CLAUDE_PLUGIN_ROOT="$PLUGIN" "$BASH" "$PLUGIN/hooks/run-hook.cmd" guard)
   assert_eq "0" "$?" "o hook rodou e saiu com 0"; assert_eq "" "$out" "nada impresso"
+}
+
+test_guard_ssh_keygen_por_cima() {
+  mkdir -p "$HOME/.ssh"
+  printf '%s' 'ssh-keygen -t ed25519 -C a@b.c' | gc guard check >/dev/null && fail "sem chave ainda: não devia pedir"
+  : > "$HOME/.ssh/id_ed25519"
+  assert_contains "$(printf '%s' 'ssh-keygen -t ed25519 -C a@b.c' | gc guard check)" "chave SSH" "caminho padrão"
+  assert_contains "$(printf '%s' 'ssh-keygen -f ~/.ssh/id_ed25519 -N x' | gc guard check)" "chave SSH" "com -f"
+  printf '%s' 'ssh-keygen -t ed25519 -f ~/.ssh/outra' | gc guard check >/dev/null && fail "arquivo novo: não devia pedir"
+  printf '%s' 'ssh-keygen -lf ~/.ssh/id_ed25519.pub' | gc guard check >/dev/null && fail "-l só lê"; return 0
 }

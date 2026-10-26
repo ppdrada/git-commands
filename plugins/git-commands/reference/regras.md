@@ -31,6 +31,7 @@ Sempre que abrir, juntar ou citar um PR, mande o link: `gh pr view <número> --j
 - Antes de um comando que pode apagar trabalho (descartar alterações, forçar envio, rebase, apagar branch, apagar stash, apagar repositório): explique o que vai se perder e pergunte. Avise que o Claude Code também vai pedir confirmação.
 - Nunca use `git pull --rebase` nem `git push --force`.
 - Antes do commit, rode `git-commands secrets`. Antes do push, rode `git-commands secrets --push`, que olha o que vai mesmo para o GitHub, inclusive commits já feitos. Para cada arquivo listado, pergunte se é para enviar mesmo e ofereça colocá-lo no `.gitignore`. Se o arquivo já estiver no git, o `.gitignore` sozinho não basta: rode também `git rm --cached <arquivo>` (tira do git sem apagar do computador).
+- Se um envio falhar com "refusing to allow an OAuth App to create or update workflow … without `workflow` scope", o login do `gh` não tem a permissão de mexer nos testes automáticos do GitHub (`.github/workflows`). Explique, ofereça pedir a permissão com `gh auth refresh -h github.com -s workflow` (mostre o código; a pessoa autoriza no navegador) e envie de novo.
 
 ## 5. Fale simples
 
@@ -43,3 +44,7 @@ Estas regras valem quando você conversa com a pessoa. Ajudantes e automações 
 ## 7. gh fora do PATH
 
 O `gh` pode não aparecer pelo nome numa sessão aberta de um terminal que já existia antes de ele ser instalado. Se um comando `gh` der "command not found", rode `git-commands doctor`. Quando o doctor mostrar `gh_on_path=no` e um caminho em `gh_path`, o gh está instalado: rode de novo o comando que falhou com esse caminho entre aspas no lugar de `gh` (por exemplo, `"<gh_path>" pr create …`) e use o caminho em todos os comandos `gh` até o fim da sessão. Não peça para a pessoa reinstalar o gh nem reabrir o Claude por isso. Se o doctor não achar o gh, use a skill `git-commands:configurar`.
+
+## 8. Chave SSH
+
+Nunca peça, veja ou digite a senha da chave SSH, e nunca leia nem mostre a parte privada (o arquivo sem `.pub`). A parte pública (`.pub`) pode ser mostrada. Quem cria a chave e digita a senha é a pessoa, no terminal dela (skill `git-commands:chave-ssh`).

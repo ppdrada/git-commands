@@ -6,10 +6,16 @@ REM Sem Git Bash, sai em silencio: o plugin continua funcionando, so sem o hook.
 REM Ideia do run-hook.cmd do superpowers (licenca MIT).
 REM So ASCII neste arquivo: na pagina de codigo 65001 (UTF-8), o cmd.exe se perde com acentos.
 setlocal
+REM Procura o Git Bash: a variavel do Claude Code, as pastas padrao e, por ultimo, o git do PATH.
 set "BASH_EXE="
-if exist "%ProgramFiles%\Git\bin\bash.exe" set "BASH_EXE=%ProgramFiles%\Git\bin\bash.exe"
+if defined CLAUDE_CODE_GIT_BASH_PATH if exist "%CLAUDE_CODE_GIT_BASH_PATH%" set "BASH_EXE=%CLAUDE_CODE_GIT_BASH_PATH%"
+if not defined BASH_EXE if exist "%ProgramFiles%\Git\bin\bash.exe" set "BASH_EXE=%ProgramFiles%\Git\bin\bash.exe"
 if not defined BASH_EXE if exist "%ProgramFiles(x86)%\Git\bin\bash.exe" set "BASH_EXE=%ProgramFiles(x86)%\Git\bin\bash.exe"
 if not defined BASH_EXE if defined LOCALAPPDATA if exist "%LOCALAPPDATA%\Programs\Git\bin\bash.exe" set "BASH_EXE=%LOCALAPPDATA%\Programs\Git\bin\bash.exe"
+if not defined BASH_EXE for /f "delims=" %%G in ('where git 2^>nul') do (
+  if not defined BASH_EXE if exist "%%~dpG..\bin\bash.exe" set "BASH_EXE=%%~dpG..\bin\bash.exe"
+  if not defined BASH_EXE if exist "%%~dpG..\..\bin\bash.exe" set "BASH_EXE=%%~dpG..\..\bin\bash.exe"
+)
 if not defined BASH_EXE exit /b 0
 "%BASH_EXE%" "%~dp0%~1" %2 %3 %4 %5 %6 %7 %8 %9
 exit /b %ERRORLEVEL%

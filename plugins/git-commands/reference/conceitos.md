@@ -58,3 +58,6 @@ O `git diff` mostra exatamente o que mudou nos arquivos: as linhas que saíram e
 
 ## publico-privado
 Um repositório público pode ser visto por qualquer pessoa na internet. Um privado só aparece para você e para quem você convidar.
+
+## chave-ssh
+Uma chave SSH é um par de arquivos: a parte privada fica só no seu computador, como a chave da sua casa; a parte pública vai para o GitHub, como a fechadura. Com ela, o git fala com o GitHub sem login, e a senha da chave protege a parte privada se alguém pegar o arquivo.

@@ -62,3 +62,30 @@ test_toplevel_sobe_ate_pasta_existente() {
   # Pela marca, e não pelo texto: o mesmo lugar tem nomes diferentes (/private/var no Mac, RUNNER~1 no Windows).
   assert_file "$t/.marca" "o topo veio como $t"
 }
+
+test_timeout_devolve_124_sempre() {
+  . "$PLUGIN/lib/common.sh"; local i rc
+  for i in 1 2 3 4 5; do gc_run_with_timeout 1 sleep 5; rc=$?; assert_eq "124" "$rc" "rodada $i"; done
+}
+
+test_github_url_so_o_servidor_github() {
+  . "$PLUGIN/lib/common.sh"; local u
+  for u in https://github.com/a/b.git https://usuario@github.com/a/b HTTPS://GitHub.com/a/b \
+           git@github.com:a/b.git ssh://git@github.com/a/b.git ssh://git@ssh.github.com:443/a/b.git; do
+    gc_is_github_url "$u" || fail "devia aceitar $u"
+  done
+  for u in https://gitlab.com/github.com/x https://github.com.exemplo.com/a/b git@gitlab.com:a/b.git \
+           https://exemplo.com/github.com ssh://git@exemplo.com/github.com/a.git; do
+    gc_is_github_url "$u" && fail "não devia aceitar $u"
+  done; return 0
+}
+
+test_github_ssh_to_https() {
+  . "$PLUGIN/lib/common.sh"
+  assert_eq "https://github.com/a/b.git" "$(gc_github_ssh_to_https git@github.com:a/b.git)" ""
+  assert_eq "https://github.com/a/b.git" "$(gc_github_ssh_to_https git@github.com:a/b)" ""
+  assert_eq "https://github.com/a/b.git" "$(gc_github_ssh_to_https ssh://git@github.com/a/b.git)" ""
+  assert_eq "https://github.com/a/b.git" "$(gc_github_ssh_to_https ssh://git@ssh.github.com:443/a/b.git)" ""
+  gc_github_ssh_to_https https://github.com/a/b.git >/dev/null && fail "já é https: devia devolver 1"
+  gc_github_ssh_to_https git@gitlab.com:a/b.git >/dev/null && fail "gitlab não é GitHub"; return 0
+}

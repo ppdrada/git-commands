@@ -2,9 +2,10 @@
 # Windows: Agendador de Tarefas; macOS: launchd; Linux: cron. Só verifica, nunca atualiza.
 # Com GIT_COMMANDS_SCHEDULE_DRY_RUN=1, launchctl e powershell.exe só são mostrados (ensaio).
 
-GC_SCHED_TASK="git-commands-verificar"
-GC_SCHED_LABEL="com.git-commands.verificar"
-GC_SCHED_MARK="# git-commands"
+# GIT_COMMANDS_SCHED_ID troca o nome (os testes usam outro, para nunca mexer no agendamento real).
+GC_SCHED_TASK="git-commands-${GIT_COMMANDS_SCHED_ID:-verificar}"
+GC_SCHED_LABEL="com.git-commands.${GIT_COMMANDS_SCHED_ID:-verificar}"
+if [ -n "${GIT_COMMANDS_SCHED_ID:-}" ]; then GC_SCHED_MARK="# git-commands-$GIT_COMMANDS_SCHED_ID"; else GC_SCHED_MARK="# git-commands"; fi
 
 gc_sched_dry() { [ "${GIT_COMMANDS_SCHEDULE_DRY_RUN:-}" = 1 ]; }
 
@@ -25,20 +26,27 @@ gc_sched_native() {
 
 gc_sched_runner() { printf '%s\n' "$(gc_home)/app/scheduler/run-scheduled"; }
 
-# ---------- Windows: Agendador de Tarefas (scripts .ps1 só com ASCII) ----------
+# Texto pronto para ficar entre aspas simples no PowerShell (o apóstrofo vira dois).
+gc_sched_ps_quote() { local q="'" s=$1; s=${s//"$q"/"$q$q"}; printf '%s\n' "$s"; }
+
+# ---------- Windows: Agendador de Tarefas (.ps1 com BOM; o texto fixo, só ASCII) ----------
 
 gc_sched_windows_enable() {
   local min=$1 h ps1 bash_w runner_w
   h=$(gc_home); ps1="$h/schedule.ps1"
-  bash_w=$(gc_sched_native "$(command -v bash)")
-  runner_w=$(gc_sched_native "$(gc_sched_runner)")
-  printf '%s\r\n' \
-    '$ErrorActionPreference = "Stop"' \
-    "\$acao = New-ScheduledTaskAction -Execute 'conhost.exe' -Argument '--headless \"$bash_w\" -l \"$runner_w\"'" \
-    "\$gatilho = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes $min)" \
-    '$ajustes = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 10)' \
-    "Register-ScheduledTask -TaskName '$GC_SCHED_TASK' -Description 'git-commands: verifica novidades no GitHub (nunca atualiza nada)' -Action \$acao -Trigger \$gatilho -Settings \$ajustes -Force | Out-Null" \
-    > "$ps1"
+  bash_w=$(gc_sched_ps_quote "$(gc_sched_native "$(command -v bash)")")
+  runner_w=$(gc_sched_ps_quote "$(gc_sched_native "$(gc_sched_runner)")")
+  # O BOM faz o PowerShell 5.1 ler o arquivo como UTF-8: sem ele, lê como ANSI e estraga um
+  # caminho com acento (C:\Users\João), e a tarefa aponta para uma pasta que não existe.
+  {
+    printf '\357\273\277'
+    printf '%s\r\n' \
+      '$ErrorActionPreference = "Stop"' \
+      "\$acao = New-ScheduledTaskAction -Execute 'conhost.exe' -Argument '--headless \"$bash_w\" -l \"$runner_w\"'" \
+      "\$gatilho = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes $min)" \
+      '$ajustes = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 10)' \
+      "Register-ScheduledTask -TaskName '$GC_SCHED_TASK' -Description 'git-commands: verifica novidades no GitHub (nunca atualiza nada)' -Action \$acao -Trigger \$gatilho -Settings \$ajustes -Force | Out-Null"
+  } > "$ps1"
   gc_sched_run powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(gc_sched_native "$ps1")" || return 1
   if gc_sched_dry; then : > "$h/dry-run-windows-task"; fi
   return 0
@@ -98,14 +106,28 @@ gc_sched_mac_on() {
 
 # ---------- Linux: cron ----------
 
-# O cron não repete a cada 90 minutos, por exemplo: acima de 60, arredonda para horas inteiras.
+# O intervalo que o cron consegue cumprir: */45, por exemplo, roda nos minutos 0 e 45 (intervalos
+# de 45 e 15). Abaixo de 60, o divisor de 60 mais próximo (no empate, o menor); de 60 em diante,
+# horas inteiras, no máximo um dia.
+gc_sched_cron_minutes() {
+  local m=$1 d dist melhor=5 menor=1440
+  if [ "$m" -lt 60 ]; then
+    for d in 5 6 10 12 15 20 30 60; do
+      dist=$(( m > d ? m - d : d - m ))
+      if [ "$dist" -lt "$menor" ]; then menor=$dist; melhor=$d; fi
+    done
+    printf '%s\n' "$melhor"; return
+  fi
+  d=$(( (m + 30) / 60 )); [ "$d" -ge 24 ] && d=24
+  printf '%s\n' "$(( d * 60 ))"
+}
+
 gc_sched_cron_expr() {
-  local m=$1 hrs
+  local m; m=$(gc_sched_cron_minutes "$1")
   if [ "$m" -lt 60 ]; then printf '*/%s * * * *\n' "$m"; return; fi
   [ "$m" -ge 1440 ] && { printf '0 0 * * *\n'; return; }
-  hrs=$(( (m + 30) / 60 ))
-  [ "$hrs" -ge 24 ] && { printf '0 0 * * *\n'; return; }
-  printf '0 */%s * * *\n' "$hrs"
+  [ "$m" -eq 60 ] && { printf '0 * * * *\n'; return; }
+  printf '0 */%s * * *\n' "$(( m / 60 ))"
 }
 
 gc_sched_linux_enable() {
@@ -138,7 +160,7 @@ gc_sched_enable() {
   case "$(gc_os)" in
     windows) gc_sched_windows_enable "$min" ;;
     mac) gc_sched_mac_enable "$min" ;;
-    *) gc_sched_linux_enable "$min" ;;
+    *) min=$(gc_sched_cron_minutes "$min"); gc_sched_linux_enable "$min" ;;
   esac || return 1
   # A contagem do aviso de verificação parada (hook session-start) começa agora.
   date +%s > "$(gc_home)/status.time"
@@ -148,24 +170,31 @@ gc_sched_enable() {
   printf 'ligado %s\n' "$min"
 }
 
+gc_sched_is_on() {
+  case "$(gc_os)" in
+    windows) gc_sched_windows_on ;;
+    mac) gc_sched_mac_on ;;
+    *) gc_sched_linux_on ;;
+  esac
+}
+
 gc_sched_disable() {
   case "$(gc_os)" in
     windows) gc_sched_windows_disable ;;
     mac) gc_sched_mac_disable ;;
     *) gc_sched_linux_disable ;;
   esac
+  # Só diz desligado depois de conferir que o agendamento saiu mesmo.
+  if gc_sched_is_on; then
+    printf 'git-commands: não consegui remover o agendamento; ele continua ligado\n' >&2
+    return 1
+  fi
   gc_config_set auto_check off
   printf 'desligado\n'
 }
 
 gc_sched_status() {
-  local on=no
-  case "$(gc_os)" in
-    windows) gc_sched_windows_on && on=yes ;;
-    mac) gc_sched_mac_on && on=yes ;;
-    *) gc_sched_linux_on && on=yes ;;
-  esac
-  if [ "$on" = yes ]; then printf 'ligado %s\n' "$(gc_config_get interval)"; else printf 'desligado\n'; fi
+  if gc_sched_is_on; then printf 'ligado %s\n' "$(gc_config_get interval)"; else printf 'desligado\n'; fi
 }
 
 gc_cmd_schedule() {

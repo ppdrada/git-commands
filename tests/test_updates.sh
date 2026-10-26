@@ -66,3 +66,54 @@ test_detail_secoes() {
   assert_contains "$out" "== Novidades no GitHub (1 commits)" ""; assert_contains "$out" "Muda o README" ""
   assert_contains "$out" "== Mexidos dos dois lados (podem dar conflito)" ""; assert_contains "$out" "README.md" ""
 }
+
+test_scan_nao_mexe_no_index() {
+  local a; a=$(make_github_pair app); touch -t 202001010000 "$a/README.md"
+  local antes; antes=$(cksum < "$a/.git/index")
+  gc updates scan --no-fetch --dir "$SANDBOX/projetos" >/dev/null
+  assert_eq "$antes" "$(cksum < "$a/.git/index")" "a varredura reescreveu o index (pode pegar o index.lock da pessoa)"
+}
+
+test_scan_projeto_ssh_busca_por_https() {
+  local a; a=$(make_github_pair app); git -C "$a" remote set-url origin git@github.com:teste/app.git
+  push_remote_commit app n.txt "um"
+  local out; out=$(GIT_SSH_COMMAND=false gc updates scan --dir "$SANDBOX/projetos")
+  assert_contains "$out" "novidades" "a busca devia ir por HTTPS, sem SSH"
+  assert_eq "git@github.com:teste/app.git" "$(git -C "$a" config --get remote.origin.url)" "o origin continua em SSH"
+}
+
+test_pull_projeto_ssh() {
+  local a; a=$(make_github_pair app); git -C "$a" remote set-url origin git@github.com:teste/app.git
+  push_remote_commit app n.txt "um"
+  assert_contains "$(GIT_SSH_COMMAND=false gc updates pull "$a")" "atualizado: +1" ""
+}
+
+test_pull_um_acesso_a_rede() {
+  local a; a=$(make_github_pair app); push_remote_commit app n.txt "um"
+  GIT_TRACE="$SANDBOX/trace.log" gc updates pull "$a" >/dev/null
+  assert_eq "1" "$(grep -c 'built-in: git fetch' "$SANDBOX/trace.log")" "updates pull foi à rede mais de uma vez"
+}
+
+test_pull_head_destacado() {
+  local a; a=$(make_github_pair app); git -C "$a" checkout -q --detach
+  local out; out=$(gc updates pull "$a"); assert_eq "7" "$?" ""
+  assert_contains "$out" "não está em nenhuma branch" ""
+}
+
+test_scan_projeto_ssh_volta_para_o_ssh_se_o_https_falha() {
+  local a bare; a=$(make_github_pair app); push_remote_commit app n.txt "um"
+  # Agora o "GitHub" só responde pelo SSH; o HTTPS falha, como num projeto privado sem o login do gh no git.
+  bare=$(native_path "$SANDBOX/remotes/app.git")
+  git config --global --unset "url.$bare.insteadOf"
+  git config --global "url.$bare.insteadOf" "git@github.com:teste/app.git"
+  git config --global "url.$(native_path "$SANDBOX")/nao-existe.git.insteadOf" "https://github.com/teste/app.git"
+  git -C "$a" remote set-url origin git@github.com:teste/app.git
+  assert_contains "$(gc updates scan --dir "$SANDBOX/projetos")" "novidades" "devia tentar pelo SSH quando o HTTPS falha"
+}
+
+test_pull_head_destacado_conta_commits_soltos() {
+  local a; a=$(make_github_pair app); git -C "$a" checkout -q --detach
+  assert_contains "$(gc updates pull "$a")" "0 commit(s) soltos" "sem commit novo"
+  printf 'x\n' > "$a/solto.txt"; git -C "$a" add solto.txt; git -C "$a" commit -qm solto
+  assert_contains "$(gc updates pull "$a")" "1 commit(s) soltos" "um commit fora de qualquer branch"
+}

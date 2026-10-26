@@ -3,7 +3,8 @@
 #   secrets [<repo>]          arquivos alterados, já preparados e novos (antes do commit)
 #   secrets --staged [<repo>] só os preparados
 #   secrets --push [<repo>]   o que o push vai mandar (commits ainda não enviados), com o
-#                             conteúdo do commit; sem upstream, todos os arquivos acompanhados
+#                             conteúdo do commit; numa branch nova, os commits que ainda não
+#                             estão em nenhum remoto; sem remoto nenhum, todos os arquivos
 
 # Motivo pelo nome do arquivo.
 gc_secret_name_reason() {
@@ -48,6 +49,8 @@ gc_cmd_secrets() {
     push)
       if git -C "$top" rev-parse -q --verify '@{u}' >/dev/null 2>&1; then
         list=$(git -c core.quotepath=false -C "$top" diff --name-only --diff-filter=ACMR '@{u}..HEAD')
+      elif [ -n "$(git -C "$top" for-each-ref --count=1 refs/remotes)" ]; then
+        list=$(git -c core.quotepath=false -C "$top" log --format= --name-only --diff-filter=ACMR HEAD --not --remotes | LC_ALL=C sort -u)
       else
         list=$(git -c core.quotepath=false -C "$top" ls-files)
       fi ;;
