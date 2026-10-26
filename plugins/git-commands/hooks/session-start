@@ -18,8 +18,13 @@ gc_numero() { case "$1" in ''|*[!0-9]*) return 1 ;; esac; }
 
 # Com a verificação automática ligada: mantém a cópia do agendador em dia, avisa se ela deu erro
 # ou parou, e conta as novidades da última verificação (sem rede: o agendador é que fala com o GitHub).
-if [ "$(gc_config_get auto_check)" = on ]; then
-  gc_app_sync 2>/dev/null
+# Os avisos e as novidades só saem ao abrir ou limpar a conversa: na retomada (resume) e no
+# resumo (compact), a conversa é a mesma e eles já foram dados.
+gc_auto=$(gc_config_get auto_check)
+[ "$gc_auto" = on ] && gc_app_sync 2>/dev/null
+gc_json_field_to gc_origem "$gc_input" source || gc_origem=""
+case "$gc_origem" in compact|resume) gc_auto=off ;; esac
+if [ "$gc_auto" = on ]; then
   gc_h=$(gc_home)
   gc_ultima=$(tail -n 1 "$gc_h/check.log" 2>/dev/null)
   case "$gc_ultima" in
