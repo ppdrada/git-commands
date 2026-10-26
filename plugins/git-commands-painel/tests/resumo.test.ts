@@ -93,6 +93,13 @@ test('resumir: desligada, erro, esperando, parada e ok', () => {
   })
 })
 
+test('sem status.tsv, nenhuma verificação terminou ainda', () => {
+  // O schedule enable grava o status.time antes da primeira verificação rodar.
+  const r = resumir(arquivos({ tsv: undefined, time: `${(AGORA - 30_000) / 1000}\n` }), AGORA, null)
+  expect(r.situacao).toBe('esperando')
+  expect(r.verificadoEm).toBeNull()
+})
+
 test('sem a pasta do git-commands, a verificação está desligada', () => {
   const r = resumir({}, AGORA, null)
   expect(r.situacao).toBe('desligada')

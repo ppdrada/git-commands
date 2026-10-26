@@ -149,7 +149,7 @@ export const register: Register = on => {
     const atual = await read($, resumo)
     if (atual === null) return <Text dimColor>Lendo o estado dos projetos…</Text>
 
-    const semProjetos = atual.situacao !== 'desligada' && atual.projetos.length === 0
+    const semProjetos = atual.verificadoEm !== null && atual.situacao !== 'desligada' && atual.projetos.length === 0
     return (
       <Box flexDirection="column" gap={1}>
         <Text dimColor>{cabecalhoDoPainel(atual)}</Text>

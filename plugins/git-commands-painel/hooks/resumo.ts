@@ -88,7 +88,8 @@ export function resumir(arquivos: Arquivos, agora: number, paradaDesde: number |
   return {
     situacao,
     projetos: lerProjetos(arquivos.tsv),
-    verificadoEm: lerHora(arquivos.time),
+    // Uma verificação que terminou grava os dois arquivos; o schedule enable grava só o status.time.
+    verificadoEm: arquivos.tsv === undefined ? null : lerHora(arquivos.time),
     motivo,
     intervalo,
     visto: agora,

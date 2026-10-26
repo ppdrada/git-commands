@@ -409,3 +409,16 @@ test('a faixa não volta quando um projeto sai da lista', async ($, on) => {
   expect((await ui.find({ type: 'Text', text: /Novidades/ }))?.text).toBe('Novidades no GitHub: site (3), api (1)')
   await ui.unmount()
 })
+
+test('logo depois de ligar a verificação, o painel espera a primeira', async ($, on) => {
+  mock.clock(on, { now: AGORA })
+  mock.env(on, { HOME: '/casa' })
+  const m = mundo(on, { config: 'auto_check=on\ninterval=30\n', 'status.time': segundos(AGORA - 30_000) })
+  await abrir($)
+  await $.command.run(PAINEL_PEDIDO)
+
+  expect(m.status.at(-1)).toBe('git-commands: esperando a verificação')
+  const ui = await $.ui.mount({ ...PAINEL, surface: 'desktop' })
+  expect((await ui.findAll({ type: 'Text' })).map(t => t.text)).toEqual(['Esperando a primeira verificação.'])
+  await ui.unmount()
+})
