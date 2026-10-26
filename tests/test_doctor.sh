@@ -25,8 +25,53 @@ test_doctor_gh_fora_do_path() {
 
 test_doctor_chaves_na_ordem() {
   local out; out=$(GIT_COMMANDS_GH=/nao/existe gc doctor)
-  assert_eq "os git git_ok gh gh_path gh_on_path gh_auth gh_user user_name user_email projects_dir auto_check interval proactive ssh_key git_protocol " \
+  assert_eq "os git git_ok gh gh_path gh_on_path gh_auth gh_user user_name user_email projects_dir github_user folders folders_missing ignored auto_check interval proactive ssh_key git_protocol " \
     "$(printf '%s\n' "$out" | sed 's/=.*//' | tr '\n' ' ')" ""
+}
+
+test_doctor_conta_as_pastas() {
+  # O doctor só conta as listas: o gh da máquina nunca entra.
+  export GIT_COMMANDS_GH=/nao/existe
+  local a="$SANDBOX/fora/Meu Site" b="$SANDBOX/fora/velha" c="$SANDBOX/fora/copia" out
+  mkdir -p "$a" "$b" "$c"
+  # Sem lista nenhuma, tudo zero.
+  out=$(gc doctor)
+  assert_eq "folders=0" "$(linha_de "$out" folders)" "sem pastas pedidas"
+  assert_eq "folders_missing=0" "$(linha_de "$out" folders_missing)" "sem pastas pedidas que faltam"
+  assert_eq "ignored=0" "$(linha_de "$out" ignored)" "sem pastas ignoradas"
+  # Duas pastas pedidas (uma é apagada depois) e uma ignorada.
+  gc folders add "$a" >/dev/null; gc folders add "$b" >/dev/null; gc folders ignore "$c" >/dev/null
+  rm -rf "$b"
+  out=$(gc doctor)
+  assert_eq "folders=2" "$(linha_de "$out" folders)" "duas pastas pedidas"
+  assert_eq "folders_missing=1" "$(linha_de "$out" folders_missing)" "uma pedida não existe mais"
+  assert_eq "ignored=1" "$(linha_de "$out" ignored)" "uma pasta ignorada"
+  # Uma pasta ignorada que sumiu continua ignorada, e não entra na conta das pedidas que faltam.
+  rm -rf "$c"
+  out=$(gc doctor)
+  assert_eq "folders_missing=1" "$(linha_de "$out" folders_missing)" "ignorada que sumiu não é pedida que falta"
+  assert_eq "ignored=1" "$(linha_de "$out" ignored)" "ignorada que sumiu continua na lista"
+}
+
+test_doctor_grava_o_login() {
+  make_gh_stub; export GIT_COMMANDS_GH="$SANDBOX/stub/gh"
+  local out
+  assert_eq "" "$(gc config get github_user)" "começa sem login gravado"
+  # O gh do computador não guarda login (STUB_GH_USER vazio): quem sabe é a API, e o doctor grava o que ela disse.
+  out=$(STUB_GH_USER= gc doctor)
+  assert_eq "github_user=tester" "$(linha_de "$out" github_user)" "mostra o login da API"
+  assert_eq "tester" "$(gc config get github_user)" "gravou o login da API"
+  assert_eq "1" "$(grep -c '^api ' "$SANDBOX/gh.log")" "só a chamada à API que o doctor já fazia"
+  # Login diferente do gravado: vale o da API (a pessoa pode ter trocado de conta no gh).
+  gc config set github_user antigo
+  out=$(gc doctor)
+  assert_eq "github_user=tester" "$(linha_de "$out" github_user)" "mostra o login novo"
+  assert_eq "tester" "$(gc config get github_user)" "trocou o login gravado"
+  # A API sem resposta (aqui, sem login no gh) não apaga o que já está gravado.
+  gc config set github_user fulano
+  out=$(STUB_GH_AUTH=1 gc doctor)
+  assert_eq "github_user=fulano" "$(linha_de "$out" github_user)" "mostra o login gravado"
+  assert_eq "fulano" "$(gc config get github_user)" "o login gravado ficou"
 }
 
 test_doctor_sem_rede() {
