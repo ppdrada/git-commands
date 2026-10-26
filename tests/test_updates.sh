@@ -110,3 +110,10 @@ test_scan_projeto_ssh_volta_para_o_ssh_se_o_https_falha() {
   git -C "$a" remote set-url origin git@github.com:teste/app.git
   assert_contains "$(gc updates scan --dir "$SANDBOX/projetos")" "novidades" "devia tentar pelo SSH quando o HTTPS falha"
 }
+
+test_pull_head_destacado_conta_commits_soltos() {
+  local a; a=$(make_github_pair app); git -C "$a" checkout -q --detach
+  assert_contains "$(gc updates pull "$a")" "0 commit(s) soltos" "sem commit novo"
+  printf 'x\n' > "$a/solto.txt"; git -C "$a" add solto.txt; git -C "$a" commit -qm solto
+  assert_contains "$(gc updates pull "$a")" "1 commit(s) soltos" "um commit fora de qualquer branch"
+}

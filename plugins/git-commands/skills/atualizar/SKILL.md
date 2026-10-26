@@ -35,7 +35,7 @@ Resuma em português, a partir do `detail`, quais arquivos mudaram e o que mudou
 | 4 (divergiu) | Explique que há commits seus e do GitHub e ofereça juntar com `git pull --no-rebase` [conceito: merge]. Se der conflito, siga o passo 5. |
 | 5 (sem upstream) | A branch ainda não existe no GitHub: ofereça enviar com a skill `git-commands:salvar`. |
 | 6 (erro de rede) | Diga que não deu para falar com o GitHub agora e sugira tentar de novo mais tarde. |
-| 7 (HEAD destacado) | O projeto não está em nenhuma branch. Se `git branch --contains HEAD` não listar nenhuma, há commits soltos: ofereça guardá-los numa branch nova (`git switch -c <nome>`). Senão, ofereça voltar para a `main` (`git switch main`). Não ofereça enviar. |
+| 7 (HEAD destacado) | O projeto não está em nenhuma branch, e a mensagem diz quantos commits estão soltos (fora de qualquer branch). Com algum, ofereça antes de tudo guardá-los numa branch nova (`git switch -c <nome>`): trocar de branch sem isso os deixaria para trás. Com 0, ofereça voltar para a `main` (`git switch main`). Não ofereça enviar. |
 
 ## 5. Conflito [conceito: conflito]
 

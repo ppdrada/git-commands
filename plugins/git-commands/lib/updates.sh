@@ -136,10 +136,12 @@ gc_updates_detail() {
 # Códigos: 0 ok; 3 alterações sem commit; 4 divergiu; 5 sem upstream; 6 erro de rede;
 # 7 HEAD destacado. Uma ida à rede só (o fetch com limite); depois junta o que já chegou.
 gc_updates_pull() {
-  local r counts ahead behind mod out
+  local r counts ahead behind mod out soltos
   r=$(gc_toplevel "${1:-.}") || { printf 'git-commands: não é um repositório git: %s\n' "${1:-.}" >&2; return 1; }
+  # HEAD destacado: conta os commits que não estão em nenhuma branch, que se perderiam ao trocar.
   git -C "$r" symbolic-ref -q HEAD >/dev/null 2>&1 || {
-    printf 'HEAD destacado: o projeto não está em nenhuma branch\n'; return 7; }
+    soltos=$(git -C "$r" rev-list --count HEAD --not --branches --remotes 2>/dev/null) || soltos=0
+    printf 'HEAD destacado: o projeto não está em nenhuma branch (%s commit(s) soltos)\n' "$soltos"; return 7; }
   git -C "$r" rev-parse -q --verify '@{u}' >/dev/null 2>&1 || {
     printf 'sem upstream: a branch %s ainda não existe no GitHub\n' "$(git -C "$r" symbolic-ref --short -q HEAD)"; return 5; }
   gc_updates_fetch "$r" || { printf 'erro de rede: não consegui falar com o GitHub\n'; return 6; }
