@@ -6,6 +6,7 @@ import {
   haQuanto,
   linhaDeStatus,
   listaDeNovidades,
+  pastaDoProjeto,
   PERGUNTA,
   rotuloDoEstado,
 } from '../hooks/textos'
@@ -27,6 +28,7 @@ function resumo(mudancas: Partial<Resumo> = {}): Resumo {
     motivo: null,
     intervalo: 30,
     visto: AGORA,
+    casa: null,
     ...mudancas,
   }
 }
@@ -98,6 +100,57 @@ test('a lista de novidades mostra 3 e conta o resto', () => {
   )
   const oito = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((nome, i) => projeto(nome, 'novidades', i + 1))
   expect(listaDeNovidades(oito)).toBe('a (1), b (2), c (3) e mais 5')
+})
+
+test('pastaDoProjeto no Windows: a pasta contada a partir da pasta do usuário, separada por \\', () => {
+  const casa = 'C:\\Users\\pessoa'
+  expect(pastaDoProjeto('C:/Users/pessoa/Documents/site', casa)).toBe('Documents\\')
+  expect(pastaDoProjeto('C:/Users/pessoa/Documents/git/api', casa)).toBe('Documents\\git\\')
+  // Direto na pasta do usuário, não sobra pasta para mostrar.
+  expect(pastaDoProjeto('C:/Users/pessoa/site', casa)).toBe('')
+  // Fora dela, a pasta inteira.
+  expect(pastaDoProjeto('C:/git/site', casa)).toBe('C:\\git\\')
+  expect(pastaDoProjeto('C:/site', casa)).toBe('C:\\')
+})
+
+test('pastaDoProjeto: o /c/ do Git Bash vale como C:/ e o Windows não diferencia maiúsculas', () => {
+  const casa = 'C:\\Users\\pessoa'
+  expect(pastaDoProjeto('/c/Users/pessoa/Documents/site', casa)).toBe('Documents\\')
+  expect(pastaDoProjeto('c:/users/PESSOA/Documents/site', casa)).toBe('Documents\\')
+  expect(pastaDoProjeto('/c/Users/pessoa/site', casa)).toBe('')
+  expect(pastaDoProjeto('/c/git/site', casa)).toBe('C:\\git\\')
+  // O que vem depois da pasta do usuário fica com as letras que o caminho traz.
+  expect(pastaDoProjeto('c:/USERS/pessoa/DOCUMENTS/Git/site', casa)).toBe('DOCUMENTS\\Git\\')
+})
+
+test('pastaDoProjeto: a pasta do usuário e o caminho aceitam \\ e /, com ou sem separador no fim', () => {
+  for (const casa of ['C:\\Users\\pessoa', 'C:\\Users\\pessoa\\', 'C:/Users/pessoa', 'C:/Users/pessoa/', '/c/Users/pessoa']) {
+    expect(pastaDoProjeto('C:/Users/pessoa/Documents/git/api', casa)).toBe('Documents\\git\\')
+    expect(pastaDoProjeto('C:\\Users\\pessoa\\Documents\\git\\api', casa)).toBe('Documents\\git\\')
+    expect(pastaDoProjeto('C:/Users/pessoa/Documents/git/api/', casa)).toBe('Documents\\git\\')
+  }
+})
+
+test('pastaDoProjeto: pasta de nome parecido com o da pasta do usuário não está dentro dela', () => {
+  expect(pastaDoProjeto('C:/Users/pessoa2/Documents/site', 'C:\\Users\\pessoa')).toBe('C:\\Users\\pessoa2\\Documents\\')
+  expect(pastaDoProjeto('/Users/pessoa2/projetos/site', '/Users/pessoa')).toBe('/Users/pessoa2/projetos/')
+})
+
+test('pastaDoProjeto no macOS e no Linux: separada por / e maiúsculas contam', () => {
+  const casa = '/Users/pessoa'
+  expect(pastaDoProjeto('/Users/pessoa/projetos/site', casa)).toBe('projetos/')
+  expect(pastaDoProjeto('/Users/pessoa/projetos/git/api', casa)).toBe('projetos/git/')
+  expect(pastaDoProjeto('/Users/pessoa/site', casa)).toBe('')
+  expect(pastaDoProjeto('/srv/projetos/site', casa)).toBe('/srv/projetos/')
+  expect(pastaDoProjeto('/users/PESSOA/projetos/site', casa)).toBe('/users/PESSOA/projetos/')
+  expect(pastaDoProjeto('/Users/pessoa/projetos/site', '/Users/pessoa/')).toBe('projetos/')
+})
+
+test('pastaDoProjeto sem a pasta do usuário mostra o caminho inteiro da pasta', () => {
+  expect(pastaDoProjeto('C:/Users/pessoa/Documents/site', null)).toBe('C:\\Users\\pessoa\\Documents\\')
+  expect(pastaDoProjeto('/c/git/site', null)).toBe('C:\\git\\')
+  expect(pastaDoProjeto('/Users/pessoa/projetos/site', null)).toBe('/Users/pessoa/projetos/')
+  expect(pastaDoProjeto('/site', null)).toBe('/')
 })
 
 test('haQuanto em minutos, horas e dias', () => {

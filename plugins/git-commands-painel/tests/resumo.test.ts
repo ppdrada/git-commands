@@ -90,7 +90,15 @@ test('resumir: desligada, erro, esperando, parada e ok', () => {
     motivo: null,
     intervalo: 30,
     visto: AGORA,
+    casa: null,
   })
+})
+
+test('resumir copia a pasta do usuário para o resumo', () => {
+  expect(resumir(arquivos(), AGORA, null, 'C:\\Users\\pessoa').casa).toBe('C:\\Users\\pessoa')
+  expect(resumir(arquivos(), AGORA, AGORA - 35 * MINUTO, '/Users/pessoa').casa).toBe('/Users/pessoa')
+  expect(resumir({}, AGORA, null, '/casa').casa).toBe('/casa')
+  expect(resumir(arquivos(), AGORA, null).casa).toBeNull()
 })
 
 test('sem status.tsv, nenhuma verificação terminou ainda', () => {

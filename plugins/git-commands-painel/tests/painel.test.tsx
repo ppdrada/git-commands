@@ -1,6 +1,6 @@
 import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
-import type { Engine } from 'claude-code/testing'
+import type { Engine, FoundElement } from 'claude-code/testing'
 
 const MINUTO = 60_000
 const HORA = 60 * MINUTO
@@ -325,17 +325,139 @@ test('/painel abre o painel com o estado de cada projeto, em todas as telas', as
   expect(await $.command.run(PAINEL_PEDIDO)).toEqual({})
   expect(m.abertos).toEqual(['painel'])
 
+  // Os projetos estão fora da pasta do usuário (/casa): a pasta aparece inteira antes de cada um.
   for (const surface of TELAS) {
     const ui = await $.ui.mount({ ...PAINEL, surface })
     expect((await ui.findAll({ type: 'Text' })).map(t => t.text)).toEqual([
       'Última verificação há 5 minutos. Ela roda a cada 30 minutos.',
+      'C:\\git\\',
       'site (main): com novidades (3)',
+      'C:\\git\\',
       'api (main): em dia',
       'Para ver e atualizar, peça ao Claude: "tem algo novo nos meus projetos?"',
     ])
     await ui.unmount()
   }
 })
+
+const NA_CASA =
+  '/casa/Documents/site\tsite\tmain\t0\t3\t0\tnovidades\n/casa/Documents/git/api\tapi\tmain\t0\t0\t0\tem-dia\n'
+
+/** Os filhos do Box da lista de projetos: o único Box em coluna sem `gap`. */
+function filhosDaLista(caixas: FoundElement[]) {
+  return caixas.find(b => b.props.flexDirection === 'column' && b.props.gap === undefined)?.children
+}
+
+test('o painel mostra em cinza a pasta de cada projeto, contada a partir da pasta do usuário', async ($, on) => {
+  mock.clock(on, { now: AGORA })
+  mock.env(on, { HOME: '/casa' })
+  mundo(on, arquivos({ 'status.tsv': NA_CASA }))
+  await abrir($)
+  await $.command.run(PAINEL_PEDIDO)
+
+  for (const surface of TELAS) {
+    const ui = await $.ui.mount({ ...PAINEL, surface })
+    const textos = await ui.findAll({ type: 'Text' })
+    expect(textos.map(t => t.text)).toEqual([
+      'Última verificação há 5 minutos. Ela roda a cada 30 minutos.',
+      'Documents/',
+      'site (main): com novidades (3)',
+      'Documents/git/',
+      'api (main): em dia',
+      'Para ver e atualizar, peça ao Claude: "tem algo novo nos meus projetos?"',
+    ])
+    // A pasta vai em cinza e o texto do projeto fica só na cor do estado.
+    expect(textos.find(t => t.text === 'Documents/')?.props).toEqual({ dimColor: true })
+    expect(textos.find(t => t.text === 'Documents/git/')?.props).toEqual({ dimColor: true })
+    expect(textos.find(t => t.text === 'site (main): com novidades (3)')?.props).toEqual({ color: 'warning' })
+    expect(textos.find(t => t.text === 'api (main): em dia')?.props).toEqual({ color: 'success' })
+    // Cada projeto é um Box com dois Text: primeiro a pasta, depois o projeto.
+    expect(filhosDaLista(await ui.findAll({ type: 'Box' }))).toMatchObject([
+      {
+        type: 'Box',
+        children: [{ type: 'Text', children: ['Documents/'] }, { type: 'Text', props: { color: 'warning' } }],
+      },
+      {
+        type: 'Box',
+        children: [{ type: 'Text', children: ['Documents/git/'] }, { type: 'Text', props: { color: 'success' } }],
+      },
+    ])
+    await ui.unmount()
+  }
+})
+
+test('um projeto direto na pasta do usuário aparece sem pasta na frente', async ($, on) => {
+  mock.clock(on, { now: AGORA })
+  mock.env(on, { HOME: '/casa' })
+  const tsv = '/srv/projetos/api\tapi\tmain\t0\t2\t0\tnovidades\n/casa/blog\tblog\tmain\t0\t0\t0\tem-dia\n'
+  mundo(on, arquivos({ 'status.tsv': tsv }))
+  await abrir($)
+  await $.command.run(PAINEL_PEDIDO)
+
+  const ui = await $.ui.mount({ ...PAINEL, surface: 'desktop' })
+  expect((await ui.findAll({ type: 'Text' })).map(t => t.text)).toEqual([
+    'Última verificação há 5 minutos. Ela roda a cada 30 minutos.',
+    '/srv/projetos/',
+    'api (main): com novidades (2)',
+    'blog (main): em dia',
+    'Para ver e atualizar, peça ao Claude: "tem algo novo nos meus projetos?"',
+  ])
+  expect(filhosDaLista(await ui.findAll({ type: 'Box' }))).toMatchObject([
+    { type: 'Box', children: [{ props: { dimColor: true } }, { props: { color: 'warning' } }] },
+    { type: 'Box', children: [{ props: { color: 'success' } }] },
+  ])
+  await ui.unmount()
+})
+
+// A pasta do usuário é a mesma que o painel já lê: o HOME ou, sem ele, o USERPROFILE.
+// O GIT_COMMANDS_HOME só muda a pasta do estado: nas linhas com um USERPROFILE do Windows ele a mantém num
+// caminho que qualquer sistema aceita, e a pasta do usuário continua vindo só do HOME ou do USERPROFILE.
+const ESTADO = '/outra/.git-commands'
+const CASAS = [
+  {
+    quem: 'HOME',
+    variaveis: { HOME: '/casa', USERPROFILE: 'C:\\Users\\perfil' },
+    caminho: '/casa/Documents/site',
+    pasta: 'Documents/',
+  },
+  {
+    quem: 'USERPROFILE',
+    variaveis: { GIT_COMMANDS_HOME: ESTADO, USERPROFILE: 'C:\\Users\\pessoa' },
+    caminho: 'C:/Users/pessoa/Documents/site',
+    pasta: 'Documents\\',
+  },
+  {
+    quem: 'USERPROFILE com HOME vazio',
+    variaveis: { GIT_COMMANDS_HOME: ESTADO, HOME: '', USERPROFILE: 'C:\\Users\\pessoa' },
+    caminho: 'C:/Users/pessoa/Documents/site',
+    pasta: 'Documents\\',
+  },
+  {
+    quem: 'HOME com GIT_COMMANDS_HOME',
+    variaveis: { GIT_COMMANDS_HOME: ESTADO, HOME: '/casa' },
+    caminho: '/casa/Documents/site',
+    pasta: 'Documents/',
+  },
+] as const
+
+for (const { quem, variaveis, caminho, pasta } of CASAS) {
+  test(`o painel conta a pasta a partir da pasta do usuário (${quem})`, async ($, on) => {
+    mock.clock(on, { now: AGORA })
+    mock.env(on, variaveis)
+    mundo(on, arquivos({ 'status.tsv': `${caminho}\tsite\tmain\t0\t3\t0\tnovidades\n` }))
+    await abrir($)
+    await $.command.run(PAINEL_PEDIDO)
+
+    const ui = await $.ui.mount({ ...PAINEL, surface: 'desktop' })
+    expect((await ui.findAll({ type: 'Text' })).map(t => t.text)).toEqual([
+      'Última verificação há 5 minutos. Ela roda a cada 30 minutos.',
+      pasta,
+      'site (main): com novidades (3)',
+      'Para ver e atualizar, peça ao Claude: "tem algo novo nos meus projetos?"',
+    ])
+    await ui.unmount()
+  })
+}
 
 test('o painel explica quando a verificação está desligada', async ($, on) => {
   mock.clock(on, { now: AGORA })

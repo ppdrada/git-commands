@@ -62,6 +62,39 @@ export function corDoEstado(estado: string): 'warning' | 'error' | 'success' | u
   return undefined
 }
 
+/** `C:/Users/x`: só `/`, sem `/` no fim e com a letra da unidade no lugar do `/c/` que o Git Bash escreve. */
+function normalizar(caminho: string): string {
+  return caminho
+    .replace(/\\/g, '/')
+    .replace(/^\/([a-z])(?=\/|$)/i, (_, unidade: string) => `${unidade.toUpperCase()}:`)
+    .replace(/\/+$/, '')
+}
+
+/**
+ * A pasta onde o projeto está, terminada no separador, para aparecer em cinza antes do nome.
+ * O separador é `\` quando o caminho tem letra de unidade (`C:/...` ou o `/c/...` do Git Bash) e `/` nos outros.
+ * Dentro da pasta do usuário (`casa`), conta a partir dela (`Documents\git\`); direto nela não há pasta (''); fora dela,
+ * ou sem `casa`, é o caminho inteiro da pasta (`C:\git\`). Com letra de unidade, a comparação não diferencia maiúsculas.
+ */
+export function pastaDoProjeto(caminho: string, casa: string | null): string {
+  const projeto = normalizar(caminho)
+  const fim = projeto.lastIndexOf('/')
+  if (fim < 0) return ''
+  const pasta = projeto.slice(0, fim)
+  const comUnidade = /^[a-z]:(\/|$)/i.test(projeto)
+  const separador = comUnidade ? '\\' : '/'
+  const igual = (a: string, b: string) => (comUnidade ? a.toLowerCase() === b.toLowerCase() : a === b)
+
+  if (casa) {
+    const base = normalizar(casa)
+    if (igual(pasta.slice(0, base.length), base)) {
+      if (pasta.length === base.length) return ''
+      if (pasta[base.length] === '/') return `${pasta.slice(base.length + 1)}/`.replaceAll('/', separador)
+    }
+  }
+  return `${pasta}/`.replaceAll('/', separador)
+}
+
 /** "site (3), api (1)": até 3 nomes, para a faixa e o aviso continuarem curtos. */
 export function listaDeNovidades(projetos: readonly Projeto[]): string {
   const lista = comNovidades(projetos)
