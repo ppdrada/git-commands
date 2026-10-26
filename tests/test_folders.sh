@@ -275,14 +275,26 @@ test_folders_uso() {
 
 # ---------- a busca na pasta do usuário ----------
 
-# Estes testes usam a pasta do usuário do sandbox ($HOME) e repositórios feitos por make_repo_at, que não têm
-# remoto de verdade: a busca só lê o endereço do origin e nunca vai à rede.
+# Estes testes usam a pasta do usuário do sandbox ($HOME) e repositórios feitos por make_repo_at ou repo_com_origin, que
+# não têm remoto de verdade: a busca só lê o endereço do origin e nunca vai à rede.
 
 # Os repositórios que o gc_home_repos acha para o login $1, em ordem: a ordem em que o find lista não vale nada.
 achados() { gc_home_repos "$@" | LC_ALL=C sort; }
 
 # O caminho real de cada pasta, dada a partir da pasta do usuário, em ordem.
 esperados() { local p; for p in "$@"; do gc_real_dir "$HOME/$p"; done | LC_ALL=C sort; }
+
+# Um repositório vazio em $HOME/$1, só com o origin $2: para a busca bastam a pasta .git e o endereço, e assim o teste não
+# gasta tempo com commits.
+repo_com_origin() { git init -q "$HOME/$1" && git -C "$HOME/$1" config remote.origin.url "$2"; }
+
+# O find de verdade, para um find falso chamar depois de entrar na frente do PATH. No Windows tem de ser o find do Git Bash,
+# e não o find.exe do sistema (que não entende as opções): se o do PATH não funcionar como find, é o /usr/bin/find.
+find_de_verdade() {
+  local f; f=$(command -v find)
+  "$f" "$SANDBOX" -maxdepth 0 >/dev/null 2>&1 || f=/usr/bin/find
+  printf '%s\n' "$f"
+}
 
 test_busca_acha_os_projetos_da_conta() {
   . "$PLUGIN/lib/common.sh"; . "$PLUGIN/lib/folders.sh"
@@ -350,6 +362,76 @@ test_busca_com_dono_em_maiusculas() {
   assert_eq "$todos" "$(achados Teste)" "login com a primeira letra maiúscula"
 }
 
+test_busca_concorda_com_o_dono_do_endereco() {
+  . "$PLUGIN/lib/common.sh"; . "$PLUGIN/lib/folders.sh"
+  local u i=0 n=0 r esperado=""
+  # Um repositório para cada forma de origin, numa pasta que o Mac não pula. Os onze primeiros são da conta, nas formas que o
+  # gc_github_owner conhece (com usuário, www., porta, SSH, git://, maiúsculas no dono e no servidor, sem nada depois do dono).
+  # Os outros não são: GitLab, sem dono, outra conta, um dono que só começa igual, um servidor que só começa igual, um com
+  # outra letra no lugar do ponto (o \. da gramática é um ponto de verdade também no awk) e o vazio.
+  for u in https://github.com/teste/a.git https://usuario@github.com/teste/a https://www.github.com/teste/a \
+    https://github.com:443/teste/a git@github.com:teste/a.git ssh://git@github.com/teste/a.git \
+    ssh://git@ssh.github.com:443/teste/a.git git://github.com/teste/a HTTPS://GitHub.COM/TESTE/a git@GITHUB.COM:Teste/a \
+    https://github.com/teste https://gitlab.com/teste/a https://github.com/ https://github.com/outra-conta/a \
+    https://github.com/teste-dois/a https://github.com.exemplo.com/teste/a https://githubxcom/teste/a ""; do
+    i=$((i + 1)); r="projetos/r$i"
+    repo_com_origin "$r" "$u"
+    if [ "$(gc_github_owner "$u")" = teste ]; then esperado="$esperado $r"; n=$((n + 1)); fi
+  done
+  assert_eq "11" "$n" "o gc_github_owner dá o login nos onze primeiros"
+  # A busca usa a mesma gramática do gc_github_owner: ela acha exatamente os repositórios em que ele dá o login.
+  assert_eq "$(esperados $esperado)" "$(achados teste)" "os mesmos repositórios que o gc_github_owner"
+}
+
+test_busca_so_a_primeira_linha_do_origin_vale() {
+  . "$PLUGIN/lib/common.sh"; . "$PLUGIN/lib/folders.sh"
+  local outra
+  mkdir -p "$HOME/outra"; outra=$(gc_real_dir "$HOME/outra")
+  # Um valor do config pode ter quebra de linha (o \n escapado no arquivo). Aqui o origin tem três linhas: um endereço da
+  # conta, o caminho de outra pasta e outro endereço da conta. Se a busca passasse adiante as linhas de baixo, o caminho
+  # viraria um projeto.
+  repo_com_origin projetos/a "$(printf '%s\n%s\n%s' https://github.com/teste/a.git "$outra" https://github.com/teste/b.git)"
+  assert_eq "$(esperados projetos/a)" "$(achados teste)" "só o projeto, pela primeira linha do origin"
+}
+
+test_busca_linha_cortada_nao_vira_projeto() {
+  . "$PLUGIN/lib/common.sh"; . "$PLUGIN/lib/folders.sh"
+  mkdir -p "$SANDBOX/stub"
+  local real
+  # A pasta do usuário é ela mesma um repositório da conta (os dotfiles), e dentro dela há um projeto da conta.
+  repo_com_origin . https://github.com/teste/dotfiles.git
+  repo_com_origin projetos/novo https://github.com/teste/novo.git
+  real=$(gc_real_dir "$HOME")
+  # Quando o limite de tempo para o find, a última linha do arquivo da busca pode ficar cortada no meio de um caminho, sem o
+  # /.git do fim. O find falso imprime o projeto inteiro e, sem quebra de linha, o começo do caminho seguinte: assim o teste
+  # não depende de tempo. Pela linha cortada, o git acharia o repositório de fora (os dotfiles).
+  printf '%s\n' '#!/usr/bin/env bash' \
+    "case \"\$1\" in */projetos) printf '%s\n%s' '$real/projetos/novo/.git' '$real/projetos' ;; esac" > "$SANDBOX/stub/find"
+  chmod +x "$SANDBOX/stub/find"
+  export PATH="$SANDBOX/stub:$PATH"
+  assert_eq "$(esperados projetos/novo)" "$(achados teste)" "a linha cortada não vira projeto"
+}
+
+test_busca_nao_sai_do_disco() {
+  . "$PLUGIN/lib/common.sh"; . "$PLUGIN/lib/folders.sh"
+  mkdir -p "$SANDBOX/stub"
+  local find_real
+  repo_com_origin a/b https://github.com/teste/b.git
+  repo_com_origin c https://github.com/teste/c.git
+  # Não dá para montar um disco num teste: o find falso anota o que vem logo depois do caminho, em cada chamada, e chama o
+  # de verdade.
+  find_real=$(find_de_verdade)
+  printf '%s\n' '#!/usr/bin/env bash' \
+    "printf '%s %s\n' \"\$2\" \"\$3\" >> \"$SANDBOX/find.log\"" \
+    "exec \"$find_real\" \"\$@\"" > "$SANDBOX/stub/find"
+  chmod +x "$SANDBOX/stub/find"
+  export PATH="$SANDBOX/stub:$PATH"
+  assert_eq "$(esperados a/b c)" "$(achados teste)" "os projetos"
+  # Uma chamada para cada pasta da pasta do usuário (a e c), as duas com o -xdev logo depois do caminho: o find não entra
+  # num disco montado dentro dela. As chamadas vão numa linha só, separadas por ";".
+  assert_eq "-xdev -maxdepth;-xdev -maxdepth;" "$(tr '\n' ';' < "$SANDBOX/find.log")" "o -xdev em cada chamada"
+}
+
 test_busca_lenta_para_no_limite() {
   . "$PLUGIN/lib/common.sh"; . "$PLUGIN/lib/folders.sh"
   export TMPDIR="$SANDBOX/tmp"; mkdir -p "$TMPDIR" "$SANDBOX/stub"
@@ -357,31 +439,59 @@ test_busca_lenta_para_no_limite() {
   # Duas pastas na pasta do usuário: a primeira a busca lê logo, e na segunda o find é lento.
   make_repo_at "$HOME/rapida/b" teste >/dev/null
   make_repo_at "$HOME/zlenta/c" teste >/dev/null
-  # O find falso dorme 5 s antes de chamar o de verdade, mas só na pasta zlenta. Se chegar ao fim do sono, deixa
-  # um marcador; se for parado, leva o sleep junto e sai. Ele chama o find pelo caminho achado antes de pôr o stub
-  # no PATH. No Windows esse caminho tem de ser o find do Git Bash, e não o find.exe do sistema (que não entende as
-  # opções): se o do PATH não funcionar como find, usa o /usr/bin/find.
-  find_real=$(command -v find)
-  "$find_real" "$SANDBOX" -maxdepth 0 >/dev/null 2>&1 || find_real=/usr/bin/find
+  # O find falso dorme 10 s antes de chamar o de verdade, mas só na pasta zlenta. Se chegar ao fim do sono, deixa
+  # um marcador; se for parado, leva o sleep junto e sai. Na rapida ele chama o de verdade na hora, e o limite de 3 s
+  # dá folga para isso mesmo onde criar processos é lento (o Windows do CI).
+  find_real=$(find_de_verdade)
   printf '%s\n' '#!/usr/bin/env bash' \
     "trap 'kill \$!; exit 143' TERM" \
-    "case \"\$1\" in */zlenta) sleep 5 & wait \$!; : > \"$SANDBOX/find-acabou\" ;; esac" \
+    "case \"\$1\" in */zlenta) sleep 10 & wait \$!; : > \"$SANDBOX/find-acabou\" ;; esac" \
     "exec \"$find_real\" \"\$@\"" > "$SANDBOX/stub/find"
   chmod +x "$SANDBOX/stub/find"
   export PATH="$SANDBOX/stub:$PATH"
   # O stderr vem por um cano ($(...)): um find que ficasse vivo com ele aberto seguraria a volta até acabar.
   t0=$SECONDS
-  err=$(GIT_COMMANDS_SEARCH_SECS=1 gc_home_repos teste 2>&1 >"$SANDBOX/out"); rc=$?
-  [ $((SECONDS - t0)) -lt 4 ] || fail "a busca não parou no limite: levou $((SECONDS - t0)) s"
+  err=$(GIT_COMMANDS_SEARCH_SECS=3 gc_home_repos teste 2>&1 >"$SANDBOX/out"); rc=$?
+  [ $((SECONDS - t0)) -lt 7 ] || fail "a busca não parou no limite: levou $((SECONDS - t0)) s"
   assert_eq "0" "$rc" "código"
-  assert_eq "git-commands: aviso: a busca na pasta do usuário passou de 1 segundos e parou no meio" "$err" "o aviso"
+  assert_eq "git-commands: aviso: a busca na pasta do usuário passou de 3 segundos e parou no meio" "$err" "o aviso"
   assert_eq "$(esperados rapida/b)" "$(cat "$SANDBOX/out")" "fica o que ela achou antes do limite"
   assert_eq "" "$(ls "$TMPDIR")" "não sobra arquivo temporário"
-  # Passado o tempo em que o find falso acabaria, a busca parou de verdade (nenhum marcador) e nada foi escrito
-  # na saída de quem chamou.
-  sleep 5
+  # O find falso da zlenta começou logo depois da rapida, perto do t0: em t0 + 12 s o sono de 10 s já teria acabado.
+  # Passado esse tempo, a busca parou de verdade (nenhum marcador) e nada foi escrito na saída de quem chamou.
+  sleep $((12 - (SECONDS - t0)))
   [ -e "$SANDBOX/find-acabou" ] && fail "o find lento continuou rodando depois do limite"
   assert_eq "$(esperados rapida/b)" "$(cat "$SANDBOX/out")" "nada escrito depois do limite"
+}
+
+test_conferencia_lenta_para_no_limite() {
+  . "$PLUGIN/lib/common.sh"; . "$PLUGIN/lib/folders.sh"
+  export TMPDIR="$SANDBOX/tmp"; mkdir -p "$TMPDIR" "$SANDBOX/stub"
+  local git_real i t0 err rc n linha todos
+  for i in 0 1 2 3 4 5 6 7 8 9; do repo_com_origin "projetos/r$i" "https://github.com/teste/r$i.git"; done
+  todos=$(esperados projetos/r0 projetos/r1 projetos/r2 projetos/r3 projetos/r4 projetos/r5 projetos/r6 projetos/r7 \
+    projetos/r8 projetos/r9)
+  # O git falso dorme 1 s quando lê o origin e depois chama o de verdade, achado antes de o stub entrar no PATH (no Windows,
+  # o do Git for Windows). Ele só entra no PATH da chamada do gc_home_repos.
+  git_real=$(command -v git)
+  printf '%s\n' '#!/usr/bin/env bash' \
+    "case \" \$* \" in *' config --get remote.origin.url '*) sleep 1 ;; esac" \
+    "exec \"$git_real\" \"\$@\"" > "$SANDBOX/stub/git"
+  chmod +x "$SANDBOX/stub/git"
+  # O find acha os dez logo, e a conferência leva 1 s por repositório: o limite dela, de 3 s contados do começo dela, a
+  # para no meio.
+  t0=$SECONDS
+  err=$(PATH="$SANDBOX/stub:$PATH" GIT_COMMANDS_SEARCH_SECS=3 gc_home_repos teste 2>&1 >"$SANDBOX/out"); rc=$?
+  [ $((SECONDS - t0)) -lt 8 ] || fail "a conferência não parou no limite: levou $((SECONDS - t0)) s"
+  assert_eq "0" "$rc" "código"
+  assert_eq "git-commands: aviso: a busca na pasta do usuário passou de 3 segundos e parou no meio" "$err" "o aviso, uma vez só"
+  n=$(grep -c . "$SANDBOX/out")
+  [ "$n" -ge 1 ] && [ "$n" -lt 10 ] || fail "devia ficar com parte dos dez projetos: ficou com $n"
+  # Fica só o que já foi conferido: cada linha é um projeto da conta.
+  while IFS= read -r linha; do
+    printf '%s\n' "$todos" | grep -qxF -- "$linha" || fail "listou o que não é projeto da conta: $linha"
+  done < "$SANDBOX/out"
+  assert_eq "" "$(ls "$TMPDIR")" "não sobra arquivo temporário"
 }
 
 # ---------- a lista de todos os projetos ----------

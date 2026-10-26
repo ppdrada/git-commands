@@ -131,7 +131,7 @@ gc_cmd_folders() {
 # escondidas, AppData e node_modules, e no Mac também Library, Desktop, Documents e Downloads, que o macOS protege.
 # Em cada pasta o find desce até 5 níveis (o .git de ~/a/b/c/d/projeto fica na profundidade 5), pula as escondidas e as
 # node_modules e continua descendo dentro dos repositórios. Uma pasta que é atalho (link) não é seguida: a busca não
-# sai de $1.
+# sai de $1. Ela também não sai do disco (-xdev): um disco ou uma pasta de rede montados dentro de $1 ficam de fora.
 # Roda no gc_run_with_timeout, num subshell em segundo plano: quando o tempo acaba, ele recebe o TERM e leva o find
 # que estiver rodando junto, para a busca parar de verdade em vez de ficar lendo o disco. O 143 é o código de quem
 # morre por TERM, o que o gc_run_with_timeout entende como tempo estourado.
@@ -146,7 +146,7 @@ gc_home_find() {
     if [ -n "$mac" ]; then
       case "$nome" in Library|Desktop|Documents|Downloads) continue ;; esac
     fi
-    find "$d" -maxdepth 5 \( -name '.*' ! -name .git -o -name node_modules \) -prune -o -type d -name .git -print -prune 2>/dev/null &
+    find "$d" -xdev -maxdepth 5 \( -name '.*' ! -name .git -o -name node_modules \) -prune -o -type d -name .git -print -prune 2>/dev/null &
     filho=$!
     wait "$filho"
     filho=
@@ -154,30 +154,58 @@ gc_home_find() {
   return 0
 }
 
+# O aviso, no stderr, de que a busca na pasta do usuário passou do limite de $1 segundos.
+gc_home_aviso() {
+  printf 'git-commands: aviso: a busca na pasta do usuário passou de %s segundos e parou no meio\n' "$1" >&2
+}
+
 # Os repositórios da pasta do usuário ($HOME) cujo origin é do GitHub e tem o dono igual ao login $1, sem
 # diferenciar maiúsculas, um por linha. Só lista pastas e lê o origin de cada repositório: não usa a rede e não lê os
-# arquivos dos projetos. Sai sempre com 0. A busca tem um limite de tempo, GIT_COMMANDS_SEARCH_SECS (só para os
-# testes, 20 s se não existir): se ele estoura, avisa no stderr e segue com o que já achou. A saída do find vai para
-# um arquivo temporário, e o stdin, o stdout e o stderr da busca não são os de quem chamou: o que sobrar vivo não
-# segura nem escreve na saída dele.
+# arquivos dos projetos. Sai sempre com 0. São duas etapas, e cada uma tem o seu limite de tempo, contado do começo
+# dela: GIT_COMMANDS_SEARCH_SECS (só para os testes, 20 s se não existir). A que estoura para e fica com o que já tem,
+# e o aviso vai para o stderr uma vez só.
+# A busca (gc_home_find) acha as pastas .git. A saída do find vai para um arquivo temporário, e o stdin, o stdout e o
+# stderr dela não são os de quem chamou: o que sobrar vivo não segura nem escreve na saída dele.
+# A conferência lê o origin de cada uma com um git config, sem subshell: a saída vai para um segundo arquivo temporário,
+# e só a primeira linha vale (um valor do config pode ter quebra de linha, e outra linha nunca vira caminho). É git -C,
+# e não --git-dir, para o Git continuar conferindo o dono da pasta (safe.directory). Um awk só tira o dono de todos, com a
+# gramática do gc_github_owner (GC_GITHUB_OWNER_RE), que chega pelo ambiente: o -v trataria as barras invertidas, e o \.
+# viraria um ponto qualquer. Uma linha que não termina em /.git (o find parado no meio pode deixar a última cortada) é
+# pulada: a partir dela, o git acharia o repositório de fora.
 gc_home_repos() {
-  local login secs root tmp rc linha repo url
+  local login secs root tmp urls rc linha repo url inicio estourou=
   login=$(printf '%s' "$1" | tr 'A-Z' 'a-z')
   [ -n "$login" ] || return 0
   root=$(gc_real_dir "$HOME") || return 0
   secs=${GIT_COMMANDS_SEARCH_SECS:-20}
   tmp=$(mktemp "${TMPDIR:-/tmp}/git-commands-busca.XXXXXX" 2>/dev/null) || return 0
+  urls=$(mktemp "${TMPDIR:-/tmp}/git-commands-origin.XXXXXX" 2>/dev/null) || { rm -f "$tmp"; return 0; }
   gc_run_with_timeout "$secs" gc_home_find "$root" </dev/null >"$tmp" 2>/dev/null
   rc=$?
-  if [ "$rc" -eq 124 ]; then
-    printf 'git-commands: aviso: a busca na pasta do usuário passou de %s segundos e parou no meio\n' "$secs" >&2
-  fi
+  if [ "$rc" -eq 124 ]; then gc_home_aviso "$secs"; estourou=1; fi
+  inicio=$SECONDS
   while IFS= read -r linha || [ -n "$linha" ]; do
+    case $linha in */.git) ;; *) continue ;; esac
+    if [ $((SECONDS - inicio)) -ge "$secs" ]; then
+      [ -n "$estourou" ] || gc_home_aviso "$secs"
+      break
+    fi
     repo=${linha%/.git}
-    url=$(git -C "$repo" config --get remote.origin.url 2>/dev/null)
-    [ "$(gc_github_owner "$url")" = "$login" ] && printf '%s\n' "$repo"
-  done < "$tmp"
-  rm -f "$tmp"
+    git -C "$repo" config --get remote.origin.url >"$urls" 2>/dev/null
+    url=; IFS= read -r url <"$urls"
+    printf '%s\n%s\n' "$repo" "$url"
+  done <"$tmp" | GC_RE=$GC_GITHUB_OWNER_RE GC_LOGIN=$login LC_ALL=C awk '
+    BEGIN { re = ENVIRON["GC_RE"]; login = ENVIRON["GC_LOGIN"] }
+    NR % 2 == 1 { repo = $0; next }
+    {
+      u = tolower($0)
+      if (!match(u, re)) next
+      resto = substr(u, RLENGTH + 1)
+      i = index(resto, "/")
+      dono = (i > 0 ? substr(resto, 1, i - 1) : resto)
+      if (dono != "" && dono == login) print repo
+    }'
+  rm -f "$tmp" "$urls"
   return 0
 }
 
@@ -232,11 +260,13 @@ gc_folders_filter() {
 
 # Todos os projetos que a verificação confere, um caminho por linha, em ordem e sem repetição: os da conta do GitHub na pasta do
 # usuário (só com login, de gc_github_user), os do GitHub na pasta de projetos e os das pastas pedidas (nas pastas escolhidas o dono
-# não importa), menos os que ficam numa pasta ignorada ou dentro dela. Cada caminho passa pelo gc_real_dir antes de tudo, porque a
-# mesma pasta pode vir escrita de formas diferentes. Uma fonte que falta ou não dá para ler vira um aviso no stderr, e as outras
-# seguem. Sai com 0 se ao menos uma fonte foi lida; se nenhuma foi, explica no stderr e sai com 1.
+# não importa), menos os que ficam numa pasta ignorada ou dentro dela. Todos os caminhos saem na forma do gc_real_dir, porque a mesma
+# pasta pode vir escrita de formas diferentes: cada pasta de onde eles vêm é convertida uma vez, antes da busca nela, e o caminho
+# de cada projeto já sai dela nessa forma (a busca no usuário parte do gc_real_dir do $HOME). Uma pasta que não dá para converter é
+# pulada. Uma fonte que falta ou não dá para ler vira um aviso no stderr, e as outras seguem. Sai com 0 se ao menos uma fonte foi
+# lida; se nenhuma foi, explica no stderr e sai com 1.
 gc_all_repos() {
-  local login fontes pasta r
+  local login fontes pasta real
   login=$(gc_github_user)
   fontes=$(gc_folders_sources)
   if [ -z "$login" ] && [ -z "$fontes" ]; then
@@ -246,7 +276,7 @@ gc_all_repos() {
   {
     [ -z "$login" ] || gc_home_repos "$login"
     printf '%s\n' "$fontes" | while IFS= read -r pasta; do
-      [ -z "$pasta" ] || gc_updates_repos "$pasta" </dev/null
+      [ -n "$pasta" ] && real=$(gc_real_dir "$pasta") && gc_updates_repos "$real" </dev/null
     done
-  } | while IFS= read -r r; do gc_real_dir "$r"; done | LC_ALL=C sort -u | gc_folders_filter
+  } | LC_ALL=C sort -u | gc_folders_filter
 }

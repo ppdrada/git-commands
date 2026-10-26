@@ -116,13 +116,18 @@ gc_is_github_url() {
   [[ $u =~ $re ]]
 }
 
+# O começo de um endereço do GitHub que vem antes do dono, numa ERE só, para o endereço já em minúsculas: o dono é o que
+# vem depois dele, até a primeira /. O gc_github_owner e a busca na pasta do usuário (o awk do gc_home_repos) usam esta
+# mesma variável, para os dois concordarem sempre sobre quem é o dono.
+GC_GITHUB_OWNER_RE='^(https?://([^/@]+@)?(www\.)?github\.com(:[0-9]+)?/|[^/@:]+@github\.com:|ssh://([^/@]+@)?(ssh\.)?github\.com(:[0-9]+)?/|git://github\.com/)'
+
 # Dono, em minúsculas, de um endereço do GitHub: https://github.com/dono/repo (com ou sem www. e
 # usuário), git@github.com:dono/repo, ssh://git@github.com/dono/repo (ou ssh.github.com pela
 # porta 443) e git://github.com/dono/repo. Código 1, sem imprimir nada, para qualquer outro.
 gc_github_owner() {
-  local u resto dono re='^(https?://([^/@]+@)?(www\.)?github\.com(:[0-9]+)?/|[^/@:]+@github\.com:|ssh://([^/@]+@)?(ssh\.)?github\.com(:[0-9]+)?/|git://github\.com/)'
+  local u resto dono
   u=$(printf '%s' "$1" | tr 'A-Z' 'a-z')
-  [[ $u =~ $re ]] || return 1
+  [[ $u =~ $GC_GITHUB_OWNER_RE ]] || return 1
   resto=${u#"${BASH_REMATCH[0]}"}; dono=${resto%%/*}
   [ -n "$dono" ] || return 1
   printf '%s\n' "$dono"
