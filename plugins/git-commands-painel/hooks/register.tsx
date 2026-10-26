@@ -3,14 +3,17 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import { atrasada, lerHora, resumir } from './resumo'
+import type { Resumo } from '../types'
+import { assinatura, atrasada, comNovidades, lerHora, resumir, temNovidadeNova } from './resumo'
 import type { Arquivos } from './resumo'
-import { linhaDeStatus } from './textos'
+import { linhaDeStatus, listaDeNovidades, PERGUNTA } from './textos'
 
 const MINUTO = 60_000
 
 const resumo = atom({ plugin: 'git-commands-painel', key: 'resumo' } as const, null)
 const parada = atom({ plugin: 'git-commands-painel', key: 'parada' } as const, null)
+const escondida = atom({ plugin: 'git-commands-painel', key: 'escondida' } as const, null)
+const avisado = atom({ plugin: 'git-commands-painel', key: 'avisado' } as const, null)
 
 /** A mesma pasta que o bash usa: GIT_COMMANDS_HOME, senão ~/.git-commands (no Windows, o HOME pode faltar). */
 async function pastaDoGitCommands($: EngineInterface): Promise<string | undefined> {
@@ -37,6 +40,18 @@ async function lerArquivos($: EngineInterface): Promise<Arquivos> {
   return { config, tsv, time, log }
 }
 
+/** O aviso rápido: só quando uma verificação nova traz commits que ainda não tinham aparecido. */
+async function avisarNovidades($: EngineInterface, novo: Resumo): Promise<void> {
+  const antes = await read($, avisado)
+  const ehNova = antes !== null && novo.verificadoEm !== antes.verificadoEm
+  if (ehNova && novo.situacao === 'ok' && temNovidadeNova(antes.novos, novo.projetos)) {
+    $.ui.toast(`Novidades no GitHub: ${listaDeNovidades(novo.projetos)}`)
+  }
+  const novos = Object.fromEntries(comNovidades(novo.projetos).map(p => [p.caminho, p.novos]))
+  const depois = { verificadoEm: novo.verificadoEm, novos }
+  if (JSON.stringify(antes) !== JSON.stringify(depois)) await update($, avisado, () => depois)
+}
+
 let ultimaLinha: string | undefined
 
 async function atualizar($: EngineInterface): Promise<void> {
@@ -53,6 +68,7 @@ async function atualizar($: EngineInterface): Promise<void> {
 
     const novo = resumir(arquivos, agora, desde)
     await update($, resumo, () => novo)
+    await avisarNovidades($, novo)
 
     const linha = linhaDeStatus(novo)
     if (linha !== ultimaLinha) {
@@ -78,5 +94,27 @@ export const register: Register = on => {
     const fim = await next(e)
     if (e.agentId === undefined) await atualizar($)
     return fim
+  })
+
+  // A faixa acima da caixa de mensagem: só com novidades, e some até a lista mudar.
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    const atual = await read($, resumo)
+    if (e.props.hasSurvey || atual === null || atual.situacao !== 'ok') return next(e)
+    const lista = assinatura(atual.projetos)
+    if (lista === '' || (await read($, escondida)) === lista) return next(e)
+
+    const { Box, Button, Text } = $.ui.resolve(e)
+    const esconder = () => update($, escondida, () => lista)
+    const verAgora = async () => {
+      await esconder()
+      void $.prompt.submit({ text: PERGUNTA })
+    }
+    return (
+      <Box gap={1} flexWrap="wrap">
+        <Text>Novidades no GitHub: {listaDeNovidades(atual.projetos)}</Text>
+        <Button key="ver" label="Ver agora" variant="primary" onPress={verAgora} />
+        <Button key="depois" label="Depois" onPress={esconder} />
+      </Box>
+    )
   })
 }

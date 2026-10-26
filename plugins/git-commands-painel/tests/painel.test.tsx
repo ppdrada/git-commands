@@ -183,3 +183,99 @@ test('só lê: nunca escreve, nunca usa a rede e nunca roda comandos', async ($,
   expect(m.lidos.length).toBeGreaterThan(0)
   expect(m.proibidos).toEqual([])
 })
+
+const DUAS_NOVIDADES = 'C:/git/site\tsite\tmain\t0\t3\t0\tnovidades\nC:/git/api\tapi\tmain\t0\t1\t0\tnovidades\n'
+const TELAS = ['terminal', 'desktop', 'vscode', 'mobile'] as const
+
+const FAIXA = {
+  plugin: 'git-commands-painel',
+  component: 'AbovePrompt',
+  props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 80, scroll: { offset: 0, bodyRows: 9 }, view: {} },
+} as const
+
+test('a faixa aparece só quando há novidades, em todas as telas', async ($, on) => {
+  mock.clock(on, { now: AGORA })
+  mock.env(on, { HOME: '/casa' })
+  const m = mundo(on, arquivos({ 'status.tsv': DUAS_NOVIDADES }))
+  await abrir($)
+
+  for (const surface of TELAS) {
+    const ui = await $.ui.mount({ ...FAIXA, surface })
+    expect((await ui.find({ type: 'Text', text: /Novidades/ }))?.text).toBe('Novidades no GitHub: site (3), api (1)')
+    await ui.unmount()
+  }
+
+  m.arquivos['status.tsv'] = EM_DIA
+  await $.turn.complete(fimDaResposta())
+  const ui = await $.ui.mount({ ...FAIXA, surface: 'desktop' })
+  expect(await ui.find({ type: 'Text', text: /Novidades/ })).toBeUndefined()
+  expect((await ui.find({ type: 'Text', text: /engine/ }))?.text).toBe('engine')
+  await ui.unmount()
+})
+
+test('Ver agora manda a pergunta e esconde a faixa', async ($, on) => {
+  mock.clock(on, { now: AGORA })
+  mock.env(on, { HOME: '/casa' })
+  const m = mundo(on, arquivos({ 'status.tsv': DUAS_NOVIDADES }))
+  await abrir($)
+
+  const ui = await $.ui.mount({ ...FAIXA, surface: 'desktop' })
+  await ui.press({ key: 'ver' })
+
+  expect(m.perguntas).toEqual(['tem algo novo nos meus projetos?'])
+  expect(await ui.find({ type: 'Text', text: /Novidades/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('Depois esconde a faixa até a lista mudar', async ($, on) => {
+  const relogio = mock.clock(on, { now: AGORA })
+  mock.env(on, { HOME: '/casa' })
+  const m = mundo(on, arquivos({ 'status.tsv': DUAS_NOVIDADES }))
+  await abrir($)
+
+  const ui = await $.ui.mount({ ...FAIXA, surface: 'desktop' })
+  await ui.press({ key: 'depois' })
+  expect(await ui.find({ type: 'Text', text: /Novidades/ })).toBeUndefined()
+
+  await relogio.advance(MINUTO)
+  expect(await ui.find({ type: 'Text', text: /Novidades/ })).toBeUndefined()
+
+  m.arquivos['status.tsv'] = DUAS_NOVIDADES.replace('\t0\t3\t0\t', '\t0\t4\t0\t')
+  await relogio.advance(MINUTO)
+  expect((await ui.find({ type: 'Text', text: /Novidades/ }))?.text).toBe('Novidades no GitHub: site (4), api (1)')
+  expect(m.perguntas).toEqual([])
+  await ui.unmount()
+})
+
+test('a faixa dá lugar a uma pesquisa', async ($, on) => {
+  mock.clock(on, { now: AGORA })
+  mock.env(on, { HOME: '/casa' })
+  mundo(on, arquivos({ 'status.tsv': DUAS_NOVIDADES }))
+  await abrir($)
+
+  const ui = await $.ui.mount({ ...FAIXA, props: { ...FAIXA.props, hasSurvey: true }, surface: 'desktop' })
+  expect(await ui.find({ type: 'Text', text: /Novidades/ })).toBeUndefined()
+  expect((await ui.find({ type: 'Text', text: /engine/ }))?.text).toBe('engine')
+  await ui.unmount()
+})
+
+test('aviso rápido só quando uma verificação nova traz novidade', async ($, on) => {
+  const relogio = mock.clock(on, { now: AGORA })
+  mock.env(on, { HOME: '/casa' })
+  const m = mundo(on, arquivos({ 'status.tsv': DUAS_NOVIDADES }))
+
+  await abrir($)
+  expect(m.avisos).toEqual([])
+
+  m.arquivos['status.time'] = segundos(relogio.now())
+  await relogio.advance(MINUTO)
+  expect(m.avisos).toEqual([])
+
+  m.arquivos['status.tsv'] = DUAS_NOVIDADES.replace('\t0\t1\t0\t', '\t0\t2\t0\t')
+  m.arquivos['status.time'] = segundos(relogio.now())
+  await relogio.advance(MINUTO)
+  expect(m.avisos).toEqual(['Novidades no GitHub: site (3), api (2)'])
+
+  await relogio.advance(MINUTO)
+  expect(m.avisos.length).toBe(1)
+})
