@@ -216,6 +216,23 @@ git-commands ssh remote ~/git/site https # volta um projeto para HTTPS
 
 A verificação automática continua buscando por HTTPS e nunca precisa da senha da chave.
 
+### Painel (opcional)
+
+O `git-commands-painel` é um plugin à parte que mostra o estado dos seus projetos sem você precisar perguntar:
+
+- **Na linha de status**, embaixo da caixa de mensagem: "git-commands: 2 com novidades", "git-commands: em dia" ou "git-commands: verificação parada".
+- **Uma faixa acima da caixa de mensagem**, só quando há novidades, com os botões **Ver agora** (pergunta ao Claude "tem algo novo nos meus projetos?") e **Depois** (esconde a faixa até a lista mudar).
+- **Um aviso rápido** quando uma verificação nova traz novidades.
+- **O comando `/painel`**, que abre ao lado da conversa a lista dos projetos com o estado de cada um.
+
+Ele só lê o que a [verificação automática](#verificação-automática) grava em `~/.git-commands`: não usa a internet, não roda git e nunca atualiza nada. Por isso, ligue a verificação automática antes. Para instalar, no terminal:
+
+```bash
+claude plugin install git-commands-painel@git-commands
+```
+
+Dentro do Claude Code, o mesmo é `/plugin install git-commands-painel@git-commands`. No app do Claude, clique no **+** ao lado da caixa de mensagem, depois em **Plugins**, e adicione o `git-commands-painel`. Depois, feche e abra o Claude Code de novo. Numa versão do Claude Code que ainda não aceita mods, o painel simplesmente não aparece.
+
 ## Comandos do git-commands
 
 As skills usam o executável `git-commands`, que o Claude Code coloca no terminal dele. Normalmente é o Claude quem roda esses comandos por você.
@@ -313,6 +330,7 @@ Desligue o modo automático só nele: `git-commands proactive off`. As skills co
 ```bash
 claude plugin marketplace update git-commands
 claude plugin update git-commands@git-commands
+claude plugin update git-commands-painel@git-commands   # se você instalou o painel
 ```
 
 **Desinstalar:**
@@ -322,6 +340,7 @@ claude plugin update git-commands@git-commands
 
    ```bash
    claude plugin uninstall git-commands@git-commands
+   claude plugin uninstall git-commands-painel@git-commands   # se você instalou o painel
    ```
 
 3. Se quiser começar do zero numa próxima instalação, apague a pasta `~/.git-commands`.
@@ -337,7 +356,7 @@ Se você já desinstalou com a verificação ligada, remova o agendamento à mã
 ## Para quem quer contribuir
 
 ```text
-.claude-plugin/marketplace.json  o marketplace (aponta para plugins/git-commands)
+.claude-plugin/marketplace.json  o marketplace (aponta para os dois plugins)
 plugins/git-commands/
   .claude-plugin/plugin.json     nome, versão e descrição do plugin
   skills/                        configurar, novo-projeto, salvar, branch-e-pr, atualizar,
@@ -349,13 +368,17 @@ plugins/git-commands/
   scheduler/                     o que o agendador do sistema roda
   reference/                     regras, glossário de conceitos e modelos de .gitignore
   evals/                         avaliações de comportamento das skills
-tests/                           os testes
-docs/superpowers/                o design e o plano de construção
+plugins/git-commands-painel/     o painel (opcional), um mod do Claude Code em TypeScript
+  hooks/                         a leitura dos arquivos, os textos e o que aparece na tela
+  types/                         o que o painel guarda durante a sessão
+  tests/                         os testes do painel
+tests/                           os testes do git-commands
+docs/superpowers/                o design e os planos de construção
 ```
 
-- **Testes:** `bash tests/run.sh`, ou `bash tests/run.sh <parte do nome>` para rodar só alguns.
-- **CI:** a cada envio, os testes rodam no GitHub em Windows, macOS (com o bash 3.2) e Linux, criando e removendo o agendamento de verdade nos três.
-- **Validação:** `claude plugin validate plugins/git-commands --strict`.
+- **Testes:** `bash tests/run.sh`, ou `bash tests/run.sh <parte do nome>` para rodar só alguns. Os do painel: `claude plugin test plugins/git-commands-painel`.
+- **CI:** a cada envio, os testes rodam no GitHub em Windows, macOS (com o bash 3.2) e Linux, criando e removendo o agendamento de verdade nos três. Os testes do painel também rodam nos três.
+- **Validação:** `claude plugin validate plugins/git-commands --strict` e `claude plugin validate plugins/git-commands-painel --strict`.
 - **Avaliações de comportamento** (o Claude pergunta antes de agir?): `GIT_COMMANDS_HOME="$(mktemp -d)" claude plugin eval plugins/git-commands --scaffold --ablation none --allow-tools Bash Read` (a pasta de estado separada evita marcar conceitos como aprendidos no seu `~/.git-commands`). Rodam no macOS e no Linux; no Windows, o Claude Code recusa, porque não consegue isolar os comandos do terminal.
 
 ## Licença

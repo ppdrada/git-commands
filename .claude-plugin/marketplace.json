@@ -10,6 +10,11 @@
       "name": "git-commands",
       "source": "./plugins/git-commands",
       "description": "Git e GitHub para quem está começando: o Claude faz os comandos, explica e pede confirmação."
+    },
+    {
+      "name": "git-commands-painel",
+      "source": "./plugins/git-commands-painel",
+      "description": "Painel opcional do git-commands: mostra no Claude quais projetos têm novidades no GitHub. Só lê, nunca atualiza nada."
     }
   ]
 }
