@@ -52,7 +52,11 @@ gc_app_sync() {
   cp -R "$GC_ROOT/bin" "$GC_ROOT/lib" "$tmp/" || { rm -rf "$tmp"; return 1; }
   [ -d "$GC_ROOT/scheduler" ] && cp -R "$GC_ROOT/scheduler" "$tmp/"
   printf '%s\n' "$v" > "$tmp/VERSION"
-  rm -rf "$app" && mv "$tmp" "$app"
+  # Troca sem deixar o agendador sem app: o antigo sai do caminho, o novo entra, e só então
+  # o antigo é apagado.
+  if [ -d "$app" ]; then mv "$app" "$app.old.$$" || { rm -rf "$tmp"; return 1; }; fi
+  mv "$tmp" "$app" || { [ -d "$app.old.$$" ] && mv "$app.old.$$" "$app"; return 1; }
+  rm -rf "$app.old.$$"
 }
 
 # Rede sem perguntas: nada de pedir senha no terminal nem abrir janela de login.
@@ -107,7 +111,7 @@ gc_config_list() {
 # ---------- GitHub e repositórios ----------
 
 gc_is_github_url() {
-  local u re='(^|[/@.])github\.com([:/]|$)'
+  local u re='^(https?://([^/@]+@)?(www\.)?github\.com(:[0-9]+)?(/|$)|[^/@:]+@github\.com:|ssh://([^/@]+@)?(ssh\.)?github\.com(:[0-9]+)?(/|$)|git://github\.com/)'
   u=$(printf '%s' "$1" | tr 'A-Z' 'a-z')
   [[ $u =~ $re ]]
 }
@@ -179,19 +183,19 @@ gc_json_escape() {
 # Roda o comando com limite de tempo (o macOS não tem `timeout`). Devolve o código
 # do comando, ou 124 se o tempo estourou. O vigia não segura o stdout de quem chamou.
 gc_run_with_timeout() {
-  local secs=$1; shift
+  local secs=$1 t0=$SECONDS; shift
   "$@" &
   local pid=$!
   ( sleep "$secs" && kill "$pid" ) </dev/null >/dev/null 2>&1 &
   local watcher=$!
   wait "$pid"
   local rc=$?
-  if kill -0 "$watcher" 2>/dev/null; then
-    kill "$watcher" 2>/dev/null
-    wait "$watcher" 2>/dev/null
-    return "$rc"
-  fi
-  return 124
+  kill "$watcher" 2>/dev/null
+  wait "$watcher" 2>/dev/null
+  # Morto por sinal depois do prazo: foi o vigia, o tempo estourou. (Olhar se o vigia ainda
+  # está vivo dava corrida: ele pode ter matado o comando e ainda não ter saído.)
+  [ "$rc" -gt 128 ] && [ $(( SECONDS - t0 )) -ge "$secs" ] && return 124
+  return "$rc"
 }
 
 # ---------- subcomandos simples ----------

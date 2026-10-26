@@ -66,3 +66,10 @@ test_detail_secoes() {
   assert_contains "$out" "== Novidades no GitHub (1 commits)" ""; assert_contains "$out" "Muda o README" ""
   assert_contains "$out" "== Mexidos dos dois lados (podem dar conflito)" ""; assert_contains "$out" "README.md" ""
 }
+
+test_scan_nao_mexe_no_index() {
+  local a; a=$(make_github_pair app); touch -t 202001010000 "$a/README.md"
+  local antes; antes=$(cksum < "$a/.git/index")
+  gc updates scan --no-fetch --dir "$SANDBOX/projetos" >/dev/null
+  assert_eq "$antes" "$(cksum < "$a/.git/index")" "a varredura reescreveu o index (pode pegar o index.lock da pessoa)"
+}

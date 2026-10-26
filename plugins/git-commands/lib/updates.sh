@@ -28,7 +28,7 @@ gc_updates_fetch() {
 gc_updates_line() {
   local r=$1 fetch=$2 name branch ahead=0 behind=0 dirty state="" counts
   name=${r##*/}
-  dirty=$(git -C "$r" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+  dirty=$(GIT_OPTIONAL_LOCKS=0 git -C "$r" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
   branch=$(git -C "$r" symbolic-ref --short -q HEAD 2>/dev/null) || branch=""
   if ! git -C "$r" rev-parse -q --verify HEAD >/dev/null 2>&1; then
     state=sem-commits

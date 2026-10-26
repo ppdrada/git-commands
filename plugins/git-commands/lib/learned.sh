@@ -19,7 +19,7 @@ gc_cmd_learned() {
       return 0 ;;
     has)
       [ $# -eq 2 ] || { gc_learned_usage; return 1; }
-      [ -f "$f" ] && grep -qx -- "$2" "$f" ;;
+      [ -f "$f" ] && grep -qxF -- "$2" "$f" ;;
     add)
       shift
       [ $# -ge 1 ] || { gc_learned_usage; return 1; }
@@ -30,7 +30,7 @@ gc_cmd_learned() {
     forget)
       [ $# -eq 2 ] || { gc_learned_usage; return 1; }
       [ -f "$f" ] || return 0
-      grep -vx -- "$2" "$f" > "$f.tmp.$$"
+      grep -vxF -- "$2" "$f" > "$f.tmp.$$"
       mv -f "$f.tmp.$$" "$f" ;;
     reset)
       rm -f "$f" ;;

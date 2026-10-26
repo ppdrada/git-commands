@@ -12,3 +12,9 @@ test_learned_ciclo() {
 test_learned_id_desconhecido() { assert_exit 2 gc learned add bananas; }
 
 test_learned_sobrevive_em_disco() { gc learned add push; assert_contains "$(cat "$(gc home)/learned")" "push" ""; }
+
+test_learned_compara_texto_exato() {
+  gc learned add commit
+  gc learned has c.mmit && fail "has c.mmit achou commit"
+  gc learned forget c.mmit; gc learned has commit || fail "forget c.mmit apagou commit"; return 0
+}
