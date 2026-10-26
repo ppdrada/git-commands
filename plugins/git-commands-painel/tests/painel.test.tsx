@@ -485,7 +485,7 @@ test('sem projetos do GitHub, o painel diz isso', async ($, on) => {
   const ui = await $.ui.mount({ ...PAINEL, surface: 'terminal' })
   expect((await ui.findAll({ type: 'Text' })).map(t => t.text)).toEqual([
     'Última verificação há 5 minutos. Ela roda a cada 30 minutos.',
-    'Nenhum projeto do GitHub na pasta de projetos.',
+    'Nenhum projeto do GitHub encontrado.',
   ])
   await ui.unmount()
 })

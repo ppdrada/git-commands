@@ -186,7 +186,7 @@ export const register: Register = on => {
             })}
           </Box>
         )}
-        {semProjetos && <Text dimColor>Nenhum projeto do GitHub na pasta de projetos.</Text>}
+        {semProjetos && <Text dimColor>Nenhum projeto do GitHub encontrado.</Text>}
         {comNovidades(atual.projetos).length > 0 && (
           <Text dimColor>Para ver e atualizar, peça ao Claude: "{PERGUNTA}"</Text>
         )}
