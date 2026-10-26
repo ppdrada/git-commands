@@ -172,10 +172,11 @@ export const register: Register = on => {
         {atual.projetos.length > 0 && (
           <Box flexDirection="column">
             {ordenarParaOPainel(atual.projetos).map(p => {
-              // A pasta vai em cinza, antes do nome; direto na pasta do usuário ela é vazia e some.
+              // A pasta vai em cinza, antes do nome e com um espaço entre os dois (o gap).
+              // Direto na pasta do usuário ela é vazia e some, e a linha fica só com o nome.
               const pasta = pastaDoProjeto(p.caminho, atual.casa)
               return (
-                <Box>
+                <Box gap={1}>
                   {pasta !== '' && <Text dimColor>{pasta}</Text>}
                   <Text color={corDoEstado(p.estado)}>
                     {p.nome} ({p.branch}): {rotuloDoEstado(p)}

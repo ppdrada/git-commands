@@ -371,14 +371,16 @@ test('o painel mostra em cinza a pasta de cada projeto, contada a partir da past
     expect(textos.find(t => t.text === 'Documents/git/')?.props).toEqual({ dimColor: true })
     expect(textos.find(t => t.text === 'site (main): com novidades (3)')?.props).toEqual({ color: 'warning' })
     expect(textos.find(t => t.text === 'api (main): em dia')?.props).toEqual({ color: 'success' })
-    // Cada projeto é um Box com dois Text: primeiro a pasta, depois o projeto.
+    // Cada projeto é um Box com dois Text, primeiro a pasta e depois o projeto, com um espaço entre os dois.
     expect(filhosDaLista(await ui.findAll({ type: 'Box' }))).toMatchObject([
       {
         type: 'Box',
+        props: { gap: 1 },
         children: [{ type: 'Text', children: ['Documents/'] }, { type: 'Text', props: { color: 'warning' } }],
       },
       {
         type: 'Box',
+        props: { gap: 1 },
         children: [{ type: 'Text', children: ['Documents/git/'] }, { type: 'Text', props: { color: 'success' } }],
       },
     ])
@@ -403,8 +405,8 @@ test('um projeto direto na pasta do usuário aparece sem pasta na frente', async
     'Para ver e atualizar, peça ao Claude: "tem algo novo nos meus projetos?"',
   ])
   expect(filhosDaLista(await ui.findAll({ type: 'Box' }))).toMatchObject([
-    { type: 'Box', children: [{ props: { dimColor: true } }, { props: { color: 'warning' } }] },
-    { type: 'Box', children: [{ props: { color: 'success' } }] },
+    { type: 'Box', props: { gap: 1 }, children: [{ props: { dimColor: true } }, { props: { color: 'warning' } }] },
+    { type: 'Box', props: { gap: 1 }, children: [{ props: { color: 'success' } }] },
   ])
   await ui.unmount()
 })
