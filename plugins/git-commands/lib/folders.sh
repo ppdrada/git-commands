@@ -123,11 +123,13 @@ gc_cmd_folders() {
 
 # ---------- a busca na pasta do usuário ----------
 
-# Os .git que ficam dentro das pastas diretas da pasta $1, um por linha. Ficam de fora, pelo NOME da pasta e nunca
-# pelo caminho (a pasta do usuário de um teste pode estar dentro de uma AppData): as escondidas, AppData e
-# node_modules, e no Mac também Library, Desktop, Documents e Downloads, que o macOS protege. Em cada pasta o find
-# desce até 5 níveis (o .git de ~/a/b/c/d/projeto fica na profundidade 5), pula as escondidas e as node_modules e
-# continua descendo dentro dos repositórios. Uma pasta que é atalho (link) não é seguida: a busca não sai de $1.
+# As pastas .git que ficam dentro das pastas diretas da pasta $1, um por linha. Só conta o .git que é pasta, como no
+# gc_updates_repos: o .git de um worktree ou de um submódulo é um arquivo, e esses não são projetos à parte. Ficam de
+# fora, pelo NOME da pasta e nunca pelo caminho (a pasta do usuário de um teste pode estar dentro de uma AppData): as
+# escondidas, AppData e node_modules, e no Mac também Library, Desktop, Documents e Downloads, que o macOS protege.
+# Em cada pasta o find desce até 5 níveis (o .git de ~/a/b/c/d/projeto fica na profundidade 5), pula as escondidas e as
+# node_modules e continua descendo dentro dos repositórios. Uma pasta que é atalho (link) não é seguida: a busca não
+# sai de $1.
 # Roda no gc_run_with_timeout, num subshell em segundo plano: quando o tempo acaba, ele recebe o TERM e leva o find
 # que estiver rodando junto, para a busca parar de verdade em vez de ficar lendo o disco. O 143 é o código de quem
 # morre por TERM, o que o gc_run_with_timeout entende como tempo estourado.
@@ -142,7 +144,7 @@ gc_home_find() {
     if [ -n "$mac" ]; then
       case "$nome" in Library|Desktop|Documents|Downloads) continue ;; esac
     fi
-    find "$d" -maxdepth 5 \( -name '.*' ! -name .git -o -name node_modules \) -prune -o -name .git -print -prune 2>/dev/null &
+    find "$d" -maxdepth 5 \( -name '.*' ! -name .git -o -name node_modules \) -prune -o -type d -name .git -print -prune 2>/dev/null &
     filho=$!
     wait "$filho"
     filho=

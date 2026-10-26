@@ -258,6 +258,8 @@ esperados() { local p; for p in "$@"; do gc_real_dir "$HOME/$p"; done | LC_ALL=C
 
 test_busca_acha_os_projetos_da_conta() {
   . "$PLUGIN/lib/common.sh"; . "$PLUGIN/lib/folders.sh"
+  # No Mac a busca pula a Documents (a lista do Mac é o assunto do teste seguinte): aqui o sistema é sempre o Linux.
+  export GIT_COMMANDS_OS=linux
   # A pasta do usuário do teste fica dentro de uma pasta escondida, de uma AppData e de uma node_modules: as
   # regras de pular valem pelo nome das pastas de dentro dela, nunca pelo caminho.
   export HOME="$SANDBOX/.cache/AppData/node_modules/home" TMPDIR="$SANDBOX/tmp"
@@ -276,8 +278,10 @@ test_busca_acha_os_projetos_da_conta() {
   make_repo_at "$HOME/Documents/outro" outra-conta >/dev/null
   make_repo_at "$HOME/Documents/parecido" teste-dois >/dev/null
   git init -q -b main "$HOME/Documents/sem-origin"
-  # Também fica de fora uma pasta que é atalho para outra (onde o sistema faz atalho de verdade): a busca não sai da
-  # pasta do usuário. Onde o ln -s só copia (Git Bash sem permissão), a cópia sai e o teste segue sem ela.
+  # Também ficam de fora um worktree de outro projeto (o .git dele é um arquivo, e o projeto já vale pela pasta
+  # principal) e uma pasta que é atalho para outra (onde o sistema faz atalho de verdade): a busca não sai da pasta
+  # do usuário. Onde o ln -s só copia (Git Bash sem permissão), a cópia sai e o teste segue sem ela.
+  git -C "$HOME/Documents/a" worktree add -q "$HOME/Documents/wt" -b wt
   make_repo_at "$SANDBOX/fora/x" teste >/dev/null
   ln -s "$SANDBOX/fora" "$HOME/atalho" 2>/dev/null
   [ -L "$HOME/atalho" ] || rm -rf "$HOME/atalho"
@@ -306,11 +310,12 @@ test_busca_no_mac_pula_as_pastas_protegidas() {
 test_busca_com_dono_em_maiusculas() {
   . "$PLUGIN/lib/common.sh"; . "$PLUGIN/lib/folders.sh"
   local todos
-  make_repo_at "$HOME/Documents/c" TESTE c >/dev/null
-  make_repo_at "$HOME/Documents/d" teste d >/dev/null
-  make_repo_at "$HOME/Documents/e" teste e >/dev/null
-  git -C "$HOME/Documents/e" remote set-url origin git@github.com:Teste/e.git
-  todos=$(esperados Documents/c Documents/d Documents/e)
+  # Numa pasta que o Mac não pula, para o teste valer em qualquer sistema.
+  make_repo_at "$HOME/projetos/c" TESTE c >/dev/null
+  make_repo_at "$HOME/projetos/d" teste d >/dev/null
+  make_repo_at "$HOME/projetos/e" teste e >/dev/null
+  git -C "$HOME/projetos/e" remote set-url origin git@github.com:Teste/e.git
+  todos=$(esperados projetos/c projetos/d projetos/e)
   # O dono do endereço vale em qualquer grafia, e o login também: o github_user guarda como o gh devolveu.
   assert_eq "$todos" "$(achados teste)" "login em minúsculas"
   assert_eq "$todos" "$(achados TESTE)" "login em maiúsculas"
