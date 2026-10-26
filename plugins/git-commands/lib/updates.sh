@@ -89,6 +89,25 @@ gc_updates_scan() {
   return 0
 }
 
+# Depois de atualizar um projeto, refaz só a linha dele no status.tsv, sem rede, para quem lê o
+# arquivo (o painel, por exemplo) não continuar vendo novidades que já chegaram. O status.time
+# não muda: ele marca a última verificação completa. No Windows o mesmo projeto pode estar escrito
+# como /c/... ou C:/..., então quem diz se é o mesmo é o git.
+gc_updates_save_line() {
+  local r=$1 f out tab=$'\t'
+  f="$(gc_home)/status.tsv"
+  [ -f "$f" ] || return 0
+  out=$(while IFS= read -r linha || [ -n "$linha" ]; do
+    caminho=${linha%%"$tab"*}; resto=${linha#*"$tab"}; nome=${resto%%"$tab"*}
+    if [ "$nome" = "${r##*/}" ] && [ "$(gc_toplevel "$caminho")" = "$r" ]; then
+      gc_updates_line "$caminho" no
+    else
+      printf '%s\n' "$linha"
+    fi
+  done < "$f")
+  printf '%s\n' "$out" > "$f.tmp.$$" && mv -f "$f.tmp.$$" "$f"
+}
+
 # Novidades salvas pela última varredura que ainda valem (recalcula sem rede).
 gc_updates_news() {
   local f out; f="$(gc_home)/status.tsv"
@@ -147,7 +166,7 @@ gc_updates_pull() {
   gc_updates_fetch "$r" || { printf 'erro de rede: não consegui falar com o GitHub\n'; return 6; }
   counts=$(git -C "$r" rev-list --left-right --count 'HEAD...@{u}')
   ahead=${counts%%[[:space:]]*}; behind=${counts##*[[:space:]]}
-  [ "$behind" -gt 0 ] || { printf 'já estava em dia\n'; return 0; }
+  [ "$behind" -gt 0 ] || { gc_updates_save_line "$r" 2>/dev/null; printf 'já estava em dia\n'; return 0; }
   mod=$(git -C "$r" status --porcelain --untracked-files=no)
   [ -z "$mod" ] || { printf 'há alterações sem commit:\n%s\n' "$mod"; return 3; }
   [ "$ahead" -eq 0 ] || { printf 'divergiu: %s commit(s) seus e %s do GitHub\n' "$ahead" "$behind"; return 4; }
@@ -156,6 +175,7 @@ gc_updates_pull() {
       *overwritten*) printf 'há arquivos que seriam sobrescritos:\n%s\n' "$out"; return 3 ;;
       *) printf 'erro: %s\n' "$out"; return 6 ;;
     esac; }
+  gc_updates_save_line "$r" 2>/dev/null
   printf 'atualizado: +%s commit(s)\n' "$behind"
 }
 
