@@ -77,7 +77,9 @@ make_gh_stub() {
   printf '%s\n' '#!/usr/bin/env bash' \
     'case "$1 $2" in' \
     '  "--version "*) printf "gh version 2.62.0 (2024-11-14)\nhttps://github.com/cli/cli/releases/tag/v2.62.0\n" ;;' \
-    '  "auth status") exit "${STUB_GH_AUTH:-0}" ;;' \
+    '  "auth status") [ -n "${STUB_GH_OFFLINE:-}" ] && echo "error connecting to api.github.com" >&2; exit "${STUB_GH_AUTH:-0}" ;;' \
+    '  "auth token") [ -n "${STUB_GH_OFFLINE:-}" ] && { echo gho_teste; exit 0; }; exit "${STUB_GH_AUTH:-0}" ;;' \
+    '  "config get") echo "${STUB_GH_PROTOCOL:-https}" ;;' \
     '  "api user") echo tester ;;' \
     '  *) exit 1 ;;' \
     'esac' > "$SANDBOX/stub/gh"

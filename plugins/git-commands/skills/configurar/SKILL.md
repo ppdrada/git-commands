@@ -28,6 +28,8 @@ Depois de instalar, rode o `git-commands doctor` de novo. Se `gh_on_path=no` mas
 
 ## 3. Conta e login (`gh_auth=no`): quem faz é a pessoa
 
+Com `gh_auth=sem-rede`, o login já existe, mas o GitHub não respondeu: o computador está sem internet agora. Não refaça o login: peça para a pessoa conferir a conexão e rode o `git-commands doctor` de novo.
+
 - Sem conta: mande para https://github.com/signup e espere ela criar.
 - Login (quem autoriza é a pessoa, no navegador):
   1. Ofereça começar o login daqui. Com o ok, rode em segundo plano `gh auth login --web --hostname github.com --git-protocol https` e leia a saída: ela mostra um código de 8 caracteres (o gh também copia o código para a área de transferência) e o endereço https://github.com/login/device.

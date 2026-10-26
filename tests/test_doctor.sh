@@ -25,6 +25,25 @@ test_doctor_gh_fora_do_path() {
 
 test_doctor_chaves_na_ordem() {
   local out; out=$(GIT_COMMANDS_GH=/nao/existe gc doctor)
-  assert_eq "os git git_ok gh gh_path gh_on_path gh_auth gh_user user_name user_email projects_dir auto_check interval proactive " \
+  assert_eq "os git git_ok gh gh_path gh_on_path gh_auth gh_user user_name user_email projects_dir auto_check interval proactive ssh_key git_protocol " \
     "$(printf '%s\n' "$out" | sed 's/=.*//' | tr '\n' ' ')" ""
+}
+
+test_doctor_sem_rede() {
+  make_gh_stub; local out
+  out=$(STUB_GH_AUTH=1 STUB_GH_OFFLINE=1 GIT_COMMANDS_GH="$SANDBOX/stub/gh" gc doctor)
+  printf '%s\n' "$out" | grep -qx 'gh_auth=sem-rede' || fail "sem internet devia dar sem-rede"
+  out=$(STUB_GH_AUTH=1 GIT_COMMANDS_GH="$SANDBOX/stub/gh" gc doctor)
+  printf '%s\n' "$out" | grep -qx 'gh_auth=no' || fail "sem login devia dar no"
+}
+
+test_doctor_ssh_e_protocolo() {
+  make_gh_stub; local out
+  out=$(GIT_COMMANDS_GH="$SANDBOX/stub/gh" gc doctor)
+  printf '%s\n' "$out" | grep -qx 'ssh_key=' || fail "sem chave"
+  printf '%s\n' "$out" | grep -qx 'git_protocol=https' || fail "protocolo padrão"
+  mkdir -p "$HOME/.ssh"; : > "$HOME/.ssh/id_ed25519.pub"
+  out=$(STUB_GH_PROTOCOL=ssh GIT_COMMANDS_GH="$SANDBOX/stub/gh" gc doctor)
+  assert_contains "$out" "ssh_key=$HOME/.ssh/id_ed25519.pub" ""
+  printf '%s\n' "$out" | grep -qx 'git_protocol=ssh' || fail "protocolo ssh"
 }

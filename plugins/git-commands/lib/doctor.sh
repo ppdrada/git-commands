@@ -44,8 +44,14 @@ gc_git_version_ok() {
   [ "$maj" -gt 2 ] || { [ "$maj" -eq 2 ] && [ "$min" -ge 28 ]; }
 }
 
+# 0 se a saída do gh auth status fala de falta de conexão, e não de login.
+gc_doctor_offline() {
+  case "$1" in *[Cc]onnect*|*"dial tcp"*|*[Tt]imeout*|*[Rr]esolve*|*[Nn]etwork*|*"no such host"*) return 0 ;; esac
+  return 1
+}
+
 gc_cmd_doctor() {
-  local git_v="" git_ok=no gh gh_v="" gh_on=no gh_auth=no gh_user=""
+  local git_v="" git_ok=no gh gh_v="" gh_on=no gh_auth=no gh_user="" auth_out="" gh_proto="" ssh_pub="" k
   if command -v git >/dev/null 2>&1; then
     git_v=$(git --version 2>/dev/null | sed -n 's/^git version //p')
     gc_git_version_ok "$git_v" && git_ok=yes
@@ -54,11 +60,16 @@ gc_cmd_doctor() {
   gh=$(gc_gh_bin)
   if [ -n "$gh" ]; then
     gh_v=$(gc_run_with_timeout 15 "$gh" --version 2>/dev/null | head -n 1 | sed -n 's/^gh version \([^ ]*\).*/\1/p')
-    if gc_run_with_timeout 15 "$gh" auth status --hostname github.com >/dev/null 2>&1; then
+    if auth_out=$(gc_run_with_timeout 15 "$gh" auth status --hostname github.com 2>&1); then
       gh_auth=yes
       gh_user=$(gc_run_with_timeout 15 "$gh" api user --jq .login 2>/dev/null)
+    elif gc_doctor_offline "$auth_out" && "$gh" auth token >/dev/null 2>&1; then
+      # O login existe (o token está guardado), mas o GitHub não respondeu: sem internet agora.
+      gh_auth=sem-rede
     fi
+    gh_proto=$("$gh" config get -h github.com git_protocol 2>/dev/null)
   fi
+  k=$(gc_ssh_key) && ssh_pub="$k.pub"
   printf 'os=%s\n' "$(gc_os)"
   printf 'git=%s\n' "$git_v"
   printf 'git_ok=%s\n' "$git_ok"
@@ -73,4 +84,6 @@ gc_cmd_doctor() {
   printf 'auto_check=%s\n' "$(gc_config_get auto_check)"
   printf 'interval=%s\n' "$(gc_config_get interval)"
   printf 'proactive=%s\n' "$(gc_config_get proactive)"
+  printf 'ssh_key=%s\n' "$ssh_pub"
+  printf 'git_protocol=%s\n' "${gh_proto:-https}"
 }
