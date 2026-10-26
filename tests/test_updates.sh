@@ -73,3 +73,29 @@ test_scan_nao_mexe_no_index() {
   gc updates scan --no-fetch --dir "$SANDBOX/projetos" >/dev/null
   assert_eq "$antes" "$(cksum < "$a/.git/index")" "a varredura reescreveu o index (pode pegar o index.lock da pessoa)"
 }
+
+test_scan_projeto_ssh_busca_por_https() {
+  local a; a=$(make_github_pair app); git -C "$a" remote set-url origin git@github.com:teste/app.git
+  push_remote_commit app n.txt "um"
+  local out; out=$(GIT_SSH_COMMAND=false gc updates scan --dir "$SANDBOX/projetos")
+  assert_contains "$out" "novidades" "a busca devia ir por HTTPS, sem SSH"
+  assert_eq "git@github.com:teste/app.git" "$(git -C "$a" config --get remote.origin.url)" "o origin continua em SSH"
+}
+
+test_pull_projeto_ssh() {
+  local a; a=$(make_github_pair app); git -C "$a" remote set-url origin git@github.com:teste/app.git
+  push_remote_commit app n.txt "um"
+  assert_contains "$(GIT_SSH_COMMAND=false gc updates pull "$a")" "atualizado: +1" ""
+}
+
+test_pull_um_acesso_a_rede() {
+  local a; a=$(make_github_pair app); push_remote_commit app n.txt "um"
+  GIT_TRACE="$SANDBOX/trace.log" gc updates pull "$a" >/dev/null
+  assert_eq "1" "$(grep -c 'built-in: git fetch' "$SANDBOX/trace.log")" "updates pull foi à rede mais de uma vez"
+}
+
+test_pull_head_destacado() {
+  local a; a=$(make_github_pair app); git -C "$a" checkout -q --detach
+  local out; out=$(gc updates pull "$a"); assert_eq "7" "$?" ""
+  assert_contains "$out" "não está em nenhuma branch" ""
+}

@@ -116,6 +116,30 @@ gc_is_github_url() {
   [[ $u =~ $re ]]
 }
 
+# Endereço HTTPS equivalente a um endereço SSH do GitHub (git@github.com:dono/repo,
+# ssh://git@github.com/dono/repo, ssh://git@ssh.github.com:443/dono/repo). Código 1 para o resto.
+gc_github_ssh_to_https() {
+  local caminho re1='^[^/@:]+@github\.com:(.+)$' re2='^ssh://([^/@]+@)?(ssh\.)?github\.com(:[0-9]+)?/(.+)$'
+  if [[ $1 =~ $re1 ]]; then caminho=${BASH_REMATCH[1]}
+  elif [[ $1 =~ $re2 ]]; then caminho=${BASH_REMATCH[4]}
+  else return 1; fi
+  caminho=${caminho%/}; caminho=${caminho%.git}
+  printf 'https://github.com/%s.git\n' "$caminho"
+}
+
+# Busca o origin com limite de tempo (quem chama faz o gc_quiet_net antes). Um origin SSH do
+# GitHub é buscado pelo endereço HTTPS equivalente, com o login do gh: o segundo plano nunca
+# precisa da senha da chave SSH.
+gc_fetch_origin() {
+  local url https
+  url=$(git -C "$1" config --get remote.origin.url 2>/dev/null)
+  if https=$(gc_github_ssh_to_https "$url"); then
+    gc_run_with_timeout "$2" git -C "$1" fetch --prune --quiet "$https" '+refs/heads/*:refs/remotes/origin/*'
+  else
+    gc_run_with_timeout "$2" git -C "$1" fetch --prune --quiet
+  fi
+}
+
 # 0 se algum remote do repositório aponta (na configuração crua) para o GitHub.
 gc_repo_is_github() {
   local url

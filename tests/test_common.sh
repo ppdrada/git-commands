@@ -79,3 +79,13 @@ test_github_url_so_o_servidor_github() {
     gc_is_github_url "$u" && fail "não devia aceitar $u"
   done; return 0
 }
+
+test_github_ssh_to_https() {
+  . "$PLUGIN/lib/common.sh"
+  assert_eq "https://github.com/a/b.git" "$(gc_github_ssh_to_https git@github.com:a/b.git)" ""
+  assert_eq "https://github.com/a/b.git" "$(gc_github_ssh_to_https git@github.com:a/b)" ""
+  assert_eq "https://github.com/a/b.git" "$(gc_github_ssh_to_https ssh://git@github.com/a/b.git)" ""
+  assert_eq "https://github.com/a/b.git" "$(gc_github_ssh_to_https ssh://git@ssh.github.com:443/a/b.git)" ""
+  gc_github_ssh_to_https https://github.com/a/b.git >/dev/null && fail "já é https: devia devolver 1"
+  gc_github_ssh_to_https git@gitlab.com:a/b.git >/dev/null && fail "gitlab não é GitHub"; return 0
+}
