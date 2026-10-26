@@ -44,14 +44,14 @@ gc_git_version_ok() {
   [ "$maj" -gt 2 ] || { [ "$maj" -eq 2 ] && [ "$min" -ge 28 ]; }
 }
 
-# 0 se a saída do gh auth status fala de falta de conexão, e não de login.
+# 0 se a saída do gh fala de falta de conexão, e não de login.
 gc_doctor_offline() {
   case "$1" in *[Cc]onnect*|*"dial tcp"*|*[Tt]imeout*|*[Rr]esolve*|*[Nn]etwork*|*"no such host"*) return 0 ;; esac
   return 1
 }
 
 gc_cmd_doctor() {
-  local git_v="" git_ok=no gh gh_v="" gh_on=no gh_auth=no gh_user="" auth_out="" gh_proto="" ssh_pub="" k
+  local git_v="" git_ok=no gh gh_v="" gh_on=no gh_auth=no gh_user="" auth_out="" api_out="" api_rc gh_proto="" ssh_pub="" k
   if command -v git >/dev/null 2>&1; then
     git_v=$(git --version 2>/dev/null | sed -n 's/^git version //p')
     gc_git_version_ok "$git_v" && git_ok=yes
@@ -63,9 +63,13 @@ gc_cmd_doctor() {
     if auth_out=$(gc_run_with_timeout 15 "$gh" auth status --hostname github.com 2>&1); then
       gh_auth=yes
       gh_user=$(gc_run_with_timeout 15 "$gh" api user --jq .login 2>/dev/null)
-    elif gc_doctor_offline "$auth_out" && "$gh" auth token >/dev/null 2>&1; then
-      # O login existe (o token está guardado), mas o GitHub não respondeu: sem internet agora.
-      gh_auth=sem-rede
+    elif "$gh" auth token >/dev/null 2>&1; then
+      # Há um token guardado, mas o login não foi confirmado. Sem internet, o gh auth status só
+      # diz que o token é inválido; quem mostra a falta de conexão é uma chamada à API.
+      api_out=$(gc_run_with_timeout 10 "$gh" api user --jq .login 2>&1); api_rc=$?
+      if [ "$api_rc" -eq 124 ] || gc_doctor_offline "$auth_out" || gc_doctor_offline "$api_out"; then
+        gh_auth=sem-rede
+      fi
     fi
     gh_proto=$("$gh" config get -h github.com git_protocol 2>/dev/null)
   fi

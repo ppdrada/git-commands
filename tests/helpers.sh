@@ -77,12 +77,12 @@ make_gh_stub() {
   printf '%s\n' '#!/usr/bin/env bash' \
     'case "$1 $2" in' \
     '  "--version "*) printf "gh version 2.62.0 (2024-11-14)\nhttps://github.com/cli/cli/releases/tag/v2.62.0\n" ;;' \
-    '  "auth status") [ -n "${STUB_GH_OFFLINE:-}" ] && echo "error connecting to api.github.com" >&2; exit "${STUB_GH_AUTH:-0}" ;;' \
+    '  "auth status") [ -n "${STUB_GH_OFFLINE:-}" ] && printf "%s\n" "X Failed to log in to github.com account tester (keyring)" "- The token in keyring is invalid." "- To re-authenticate, run: gh auth refresh -h github.com" >&2; exit "${STUB_GH_AUTH:-0}" ;;' \
     '  "auth token") [ -n "${STUB_GH_OFFLINE:-}" ] && { echo gho_teste; exit 0; }; exit "${STUB_GH_AUTH:-0}" ;;' \
     '  "config get") echo "${STUB_GH_PROTOCOL:-https}" ;;' \
     '  "config set") exit 0 ;;' \
     '  "api meta") printf "%s\n" "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=" ;;' \
-    '  "api user") echo tester ;;' \
+    '  "api user") [ -n "${STUB_GH_OFFLINE:-}" ] && { printf "%s\n" "error connecting to api.github.com" "check your internet connection or https://githubstatus.com" >&2; exit 1; }; echo tester ;;' \
     '  *) exit 1 ;;' \
     'esac' > "$SANDBOX/stub/gh"
   chmod +x "$SANDBOX/stub/gh"
