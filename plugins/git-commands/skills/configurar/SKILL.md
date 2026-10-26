@@ -51,7 +51,9 @@ git config --global user.email "<e-mail>"
 
 ## 5. Pasta de projetos (`projects_dir` vazio)
 
-Pergunte onde a pessoa quer guardar os projetos novos: é onde o `novo-projeto` cria os projetos e onde o `comandos` baixa os clones. Os projetos que ela já tem em outros lugares não precisam mudar de pasta: com o login no GitHub feito (`github_user=` preenchido no doctor), a verificação automática já acha sozinha os da conta dela na pasta do usuário, e a pasta de projetos é só mais um lugar onde ela olha. No Windows e no Linux, sugira `~/Documents/git` se `~/Documents` existir, senão `~/git`. No Mac, sugira `~/git`: o macOS costuma bloquear a pasta Documentos para tarefas em segundo plano, e a verificação automática não conseguiria ler os projetos dessa pasta. Crie a pasta e grave: `git-commands config set projects_dir "<pasta>"`.
+Pergunte onde a pessoa quer guardar os projetos novos: é onde o `novo-projeto` cria os projetos e onde o `comandos` baixa os clones. No Windows e no Linux, sugira `~/Documents/git` se `~/Documents` existir, senão `~/git`. No Mac, sugira `~/git`: o macOS costuma bloquear a pasta Documentos para tarefas em segundo plano, e a verificação automática não conseguiria ler os projetos dessa pasta. Crie a pasta e grave: `git-commands config set projects_dir "<pasta>"`.
+
+A pasta de projetos não é a única maneira de a verificação automática achar projetos: com o login no GitHub feito (`github_user=` preenchido no doctor), ela também acha sozinha, na pasta do usuário, os projetos da conta da pessoa. Essa busca não acha os projetos de outro disco ou fora da pasta do usuário (como `C:/git`), os de organização ou de outra pessoa, os que estão a mais de 5 níveis de pastas e, no Mac, os que estão em Documentos, Mesa, Downloads ou `Library`. Se a pessoa já tem projetos assim, não diga que a verificação já os acha: ofereça pedir a pasta deles (`git-commands folders add "<pasta>"`, skill `git-commands:verificacao-automatica`) ou mover os projetos para a pasta de projetos. No Mac, se estão em Documentos, Mesa ou Downloads, prefira mover para `~/git`: pedir essas pastas pode fazer o macOS pedir a permissão da pessoa, e sem ela a verificação pula a pasta com um aviso.
 
 ## Ligar e desligar o git-commands
 
@@ -70,3 +72,4 @@ Explique que, desligado, o plugin só age quando a pessoa pede.
 | Inventar nome ou e-mail | Perguntar, oferecendo o e-mail privado do GitHub |
 | Esquecer a pasta de projetos | Perguntar quando `projects_dir` estiver vazio: é onde nascem os projetos novos |
 | Dizer que a verificação automática não funciona sem a pasta de projetos | Com o login no GitHub, ela já procura na pasta do usuário; a pasta de projetos e as pastas pedidas (`git-commands folders add`) entram além disso |
+| Prometer que a verificação automática já acha todos os projetos da pessoa | Ela acha sozinha só os da conta dela na pasta do usuário (até 5 níveis). Os de outro disco, de organização e, no Mac, de Documentos, Mesa, Downloads e `Library` precisam de `git-commands folders add` ou da pasta de projetos |
