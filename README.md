@@ -179,7 +179,7 @@ Você não precisa guardar tudo numa pasta só. A verificação junta três luga
 
 Na pasta do usuário, a busca **pula** as pastas escondidas (o nome começa com `.`, como `.claude`), a `AppData` e as `node_modules`. Ela nunca sai da pasta do usuário: outro disco, ou a `C:\` inteira, só entra se você pedir a pasta. Sem login no GitHub, essa busca fica desligada, e valem só a pasta de projetos e as pastas pedidas. Projetos de uma organização ou de outra pessoa (o `origin` não é seu) não são achados sozinhos: deixe-os na pasta de projetos ou peça a pasta deles.
 
-A busca só lista pastas e lê o `origin` de cada projeto: não usa a internet e não lê os seus arquivos. Ela tem um limite de tempo (20 segundos): se a sua pasta for enorme, ela para no meio, e a verificação segue com o que achou.
+A busca só lista pastas e lê o `origin` de cada projeto: não usa a internet e não lê os seus arquivos. Ela tem um limite de tempo: 20 segundos para achar os projetos e mais 20 para conferir de quem eles são. Se a sua pasta for enorme, ela para no meio, e a verificação segue com o que achou.
 
 > **No macOS**, a busca na pasta do usuário também pula a `Library` e as pastas Documentos, Mesa e Downloads (`Documents`, `Desktop` e `Downloads` no disco): o sistema não deixa tarefas em segundo plano lerem essas pastas. Um projeto que está numa delas só entra se você pedir a pasta (`git-commands folders add ~/Documents/site`) ou se ela for a pasta de projetos. Aí foi você que escolheu, e o macOS pode pedir a sua permissão; sem ela, a verificação avisa "sem permissão" e pula a pasta. O mais simples é guardar os projetos fora delas, por exemplo em `~/git`.
 
@@ -363,11 +363,11 @@ Peça "confere a verificação automática". Os casos mais comuns:
 Rode `git-commands folders list` (ou peça "onde você procura meus projetos?") e confira:
 
 - **O projeto está numa pasta ignorada** (linha `ignorada`)? Rode `git-commands folders unignore <pasta>`.
-- **A busca na pasta do usuário não alcança o projeto:** o `origin` não é da sua conta (organização, outra pessoa), ele está fundo demais (mais de 5 níveis), numa pasta escondida, na `AppData` ou numa `node_modules`, ou fora da pasta do usuário (outro disco, `C:/git`). Peça a pasta dele: `git-commands folders add <pasta>` (pode ser a própria pasta do projeto ou uma que a contém, até 2 níveis acima).
+- **A busca na pasta do usuário não alcança o projeto:** o `origin` não é da sua conta (organização, outra pessoa), ele está fundo demais (mais de 5 níveis), numa pasta escondida, na `AppData` ou numa `node_modules`, no macOS na `Library` ou em Documentos, Mesa ou Downloads, ou fora da pasta do usuário (outro disco, `C:/git`). Peça a pasta dele: `git-commands folders add <pasta>` (pode ser a própria pasta do projeto ou uma que a contém, até 2 níveis acima).
 - **Só entram projetos do GitHub.** Um projeto que ainda não está ligado ao GitHub, ou que está em outro serviço, não aparece.
 - **Aviso "a pasta de projetos não foi encontrada" ou "a pasta pedida não foi encontrada":** a pasta foi apagada, renomeada ou está num disco desligado. A verificação pula a pasta e segue com as outras. Se ela não volta mais, tire-a da lista com `git-commands folders remove <pasta>` (com o caminho exatamente como o `folders list` mostra) ou escolha a pasta de projetos de novo.
 - **macOS, aviso "sem permissão para ler a pasta":** a pasta está em Documentos, Mesa ou Downloads, e o sistema não deixa tarefas em segundo plano lerem essas pastas. Mova os projetos para `~/git` e, se era a pasta de projetos, rode `git-commands config set projects_dir ~/git`.
-- **Aviso "a busca na pasta do usuário passou de 20 segundos e parou no meio":** a pasta do usuário é grande, ou o disco está lento. Os projetos que a busca não alcançou não aparecem. Peça a pasta deles com `git-commands folders add <pasta>`.
+- **Aviso "a busca na pasta do usuário passou de 20 segundos e parou no meio":** a pasta do usuário é grande, tem muitos projetos ou o disco está lento. Os projetos que a busca não alcançou não aparecem. Peça a pasta deles com `git-commands folders add <pasta>`.
 
 Os avisos ficam no fim de `~/.git-commands/check.log`. A verificação continua funcionando com o que achou.
 </details>
