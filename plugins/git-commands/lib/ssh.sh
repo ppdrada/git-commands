@@ -111,8 +111,10 @@ gc_ssh_config() {
   [ -f "$cfg" ] || novo=sim
   {
     [ -s "$cfg" ] && printf '\n'
-    printf '%s\n' '# git-commands: inicio' 'Host github.com' '  AddKeysToAgent yes'
-    [ "$(gc_os)" = mac ] && printf '%s\n' '  UseKeychain yes'
+    # IdentitiesOnly: só essa chave vai para o GitHub (outra chave da pessoa poderia entrar em outra
+    # conta). IgnoreUnknown: o OpenSSH do Homebrew não conhece UseKeychain e recusaria o arquivo.
+    printf '%s\n' '# git-commands: inicio' 'Host github.com' '  AddKeysToAgent yes' '  IdentitiesOnly yes'
+    [ "$(gc_os)" = mac ] && printf '%s\n' '  IgnoreUnknown UseKeychain' '  UseKeychain yes'
     printf '%s\n' "  IdentityFile ~/.ssh/${k##*/}" '# git-commands: fim'
   } >> "$cfg" || return 1
   [ "$novo" = sim ] && chmod 600 "$cfg" 2>/dev/null

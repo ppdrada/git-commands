@@ -30,9 +30,12 @@ test_ssh_config_escreve_bloco() {
   assert_eq "escrito" "$(GIT_COMMANDS_OS=linux gc ssh config)" ""
   local c; c=$(cat "$HOME/.ssh/config")
   assert_contains "$c" "Host github.com" ""; assert_contains "$c" "IdentityFile ~/.ssh/id_ed25519" ""
+  assert_contains "$c" "IdentitiesOnly yes" "só essa chave vai para o GitHub (outra chave poderia entrar em outra conta)"
   assert_not_contains "$c" "UseKeychain" "UseKeychain só no mac"
   assert_eq "já existe" "$(GIT_COMMANDS_OS=linux gc ssh config)" ""; assert_eq "1" "$(grep -c 'Host github.com' "$HOME/.ssh/config")" ""
-  rm "$HOME/.ssh/config"; GIT_COMMANDS_OS=mac gc ssh config >/dev/null; assert_contains "$(cat "$HOME/.ssh/config")" "UseKeychain yes" ""
+  rm "$HOME/.ssh/config"; GIT_COMMANDS_OS=mac gc ssh config >/dev/null; c=$(cat "$HOME/.ssh/config")
+  assert_contains "$c" "UseKeychain yes" ""
+  assert_contains "$c" "IgnoreUnknown UseKeychain" "o OpenSSH do Homebrew não conhece UseKeychain"
 }
 
 test_ssh_config_respeita_host_existente() {

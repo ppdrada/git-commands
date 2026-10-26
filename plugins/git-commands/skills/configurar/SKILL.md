@@ -37,6 +37,7 @@ Com `gh_auth=sem-rede`, o login já existe, mas o GitHub não respondeu: o compu
   3. Quando o login terminar, confira com `gh auth status` e rode `gh auth setup-git`.
 - Se ela preferir fazer sozinha: abrir o PowerShell pelo menu Iniciar (uma janela nova já enxerga o gh recém-instalado), rodar `gh auth login` e escolher GitHub.com → HTTPS → "Yes" → "Login with a web browser". O código aparece nessa janela.
 - Nunca peça senha, token ou código para colar no chat.
+- O login pelo navegador (HTTPS) é o padrão. Se a pessoa quiser usar chave SSH, use a skill `git-commands:chave-ssh` depois do login.
 
 ## 4. Nome e e-mail do git (`user_name` ou `user_email` vazio) [conceito: git-config]
 
