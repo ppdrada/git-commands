@@ -472,7 +472,8 @@ test_conferencia_lenta_para_no_limite() {
   todos=$(esperados projetos/r0 projetos/r1 projetos/r2 projetos/r3 projetos/r4 projetos/r5 projetos/r6 projetos/r7 \
     projetos/r8 projetos/r9)
   # O git falso dorme 1 s quando lê o origin e depois chama o de verdade, achado antes de o stub entrar no PATH (no Windows,
-  # o do Git for Windows). Ele só entra no PATH da chamada do gc_home_repos.
+  # o do Git for Windows). Ele só entra no PATH da chamada do gc_home_repos, dentro do $(...). É export, e não PATH=... na
+  # frente da função: a atribuição comum esvazia a tabela em que o bash guarda onde achou o git, em qualquer versão dele.
   git_real=$(command -v git)
   printf '%s\n' '#!/usr/bin/env bash' \
     "case \" \$* \" in *' config --get remote.origin.url '*) sleep 1 ;; esac" \
@@ -481,7 +482,7 @@ test_conferencia_lenta_para_no_limite() {
   # O find acha os dez logo, e a conferência leva 1 s por repositório: o limite dela, de 3 s contados do começo dela, a
   # para no meio.
   t0=$SECONDS
-  err=$(PATH="$SANDBOX/stub:$PATH" GIT_COMMANDS_SEARCH_SECS=3 gc_home_repos teste 2>&1 >"$SANDBOX/out"); rc=$?
+  err=$(export PATH="$SANDBOX/stub:$PATH"; GIT_COMMANDS_SEARCH_SECS=3 gc_home_repos teste 2>&1 >"$SANDBOX/out"); rc=$?
   [ $((SECONDS - t0)) -lt 8 ] || fail "a conferência não parou no limite: levou $((SECONDS - t0)) s"
   assert_eq "0" "$rc" "código"
   assert_eq "git-commands: aviso: a busca na pasta do usuário passou de 3 segundos e parou no meio" "$err" "o aviso, uma vez só"
