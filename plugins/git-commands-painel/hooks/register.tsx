@@ -99,11 +99,14 @@ async function atualizar($: EngineInterface): Promise<void> {
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'painel', description: 'Mostra o estado dos seus projetos do GitHub (git-commands)' })
     await atualizar($)
     $.clock.every(MINUTO, () => {
       void atualizar($)
     })
+    // Sem o /painel (outro plugin já tem um, por exemplo), a linha de status e a faixa continuam.
+    try {
+      await $.command.register({ name: 'painel', description: 'Mostra o estado dos seus projetos do GitHub (git-commands)' })
+    } catch {}
     return next(e)
   })
 

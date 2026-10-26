@@ -33,6 +33,8 @@ type Mundo = {
   abertos: string[]
   /** se a tela consegue mostrar o painel */
   abre: boolean
+  /** se o Claude aceita registrar o /painel */
+  registra: boolean
   /** escritas, rede e comandos: o painel nunca pode pedir nenhum */
   proibidos: string[]
 }
@@ -51,6 +53,7 @@ function mundo(on: On, inicio: Arquivos): Mundo {
     perguntas: [],
     abertos: [],
     abre: true,
+    registra: true,
     proibidos: [],
   }
   on('fs.read', (_, e) => {
@@ -68,7 +71,7 @@ function mundo(on: On, inicio: Arquivos): Mundo {
     m.avisos.push(e.text)
     return { value: undefined }
   })
-  on('command.register', (_, e) => ({ value: { command: e.name } }))
+  on('command.register', (_, e) => (m.registra ? { value: { command: e.name } } : { deny: 'já existe um /painel' }))
   on('ui.open', (_, e) => {
     m.abertos.push(e.id)
     return { value: m.abre ? { isPlaced: true } : { isPlaced: false, reason: 'no-surface' } }
@@ -421,4 +424,17 @@ test('logo depois de ligar a verificação, o painel espera a primeira', async (
   const ui = await $.ui.mount({ ...PAINEL, surface: 'desktop' })
   expect((await ui.findAll({ type: 'Text' })).map(t => t.text)).toEqual(['Esperando a primeira verificação.'])
   await ui.unmount()
+})
+
+test('se o /painel for recusado, a linha de status continua', async ($, on) => {
+  const relogio = mock.clock(on, { now: AGORA })
+  mock.env(on, { HOME: '/casa' })
+  const m = mundo(on, arquivos())
+  m.registra = false
+  await abrir($)
+
+  expect(m.status.at(-1)).toBe('git-commands: 1 com novidades')
+  m.arquivos['status.tsv'] = EM_DIA
+  await relogio.advance(MINUTO)
+  expect(m.status.at(-1)).toBe('git-commands: em dia')
 })
