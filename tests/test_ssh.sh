@@ -140,3 +140,22 @@ test_ssh_known_hosts_respeita_arquivo_escrito_a_mao() {
   printf '[ssh.github.com]:443 ssh-ed25519 %s\n' "$ed" > "$kh"   # só a porta 443
   gc ssh known-hosts >/dev/null; grep -qx "github.com ssh-ed25519 $ed" "$kh" || fail "a chave do github.com não entrou"
 }
+
+test_ssh_known_hosts_nao_grava_o_erro_da_api() {
+  make_gh_stub; export GIT_COMMANDS_GH="$SANDBOX/stub/gh"; mkdir -p "$HOME/.ssh"; local kh="$HOME/.ssh/known_hosts" out rc
+  printf 'gitlab.com ssh-ed25519 AAAAoutrachave\n' > "$kh"
+  # Como o gh real num erro HTTP com --jq: o corpo do erro (JSON em várias linhas) no stdout e código 1.
+  out=$(STUB_GH_API_ERROR=$'{\n  "message": "Bad credentials",\n  "status": "401"\n}' gc ssh known-hosts 2>&1); rc=$?
+  assert_eq "gitlab.com ssh-ed25519 AAAAoutrachave" "$(cat "$kh")" "mexeu no known_hosts"
+  assert_eq "1" "$rc" "código"
+  assert_contains "$out" "não consegui buscar as chaves do servidor do GitHub" ""
+}
+
+test_ssh_known_hosts_so_grava_linhas_de_chave() {
+  make_gh_stub; export GIT_COMMANDS_GH="$SANDBOX/stub/gh"; local out rc
+  # O gh saiu com 0, mas uma linha não é chave (o formato da API mudou, por exemplo): nem a chave boa entra.
+  out=$(STUB_GH_META=$'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\nnull' gc ssh known-hosts 2>&1); rc=$?
+  [ -e "$HOME/.ssh/known_hosts" ] && fail "gravou com uma linha que não é chave: $(cat "$HOME/.ssh/known_hosts")"
+  assert_eq "1" "$rc" "código"
+  assert_contains "$out" "não consegui buscar as chaves do servidor do GitHub" ""
+}
