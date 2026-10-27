@@ -258,6 +258,67 @@ gc_folders_filter() {
     }'
 }
 
+# ---------- segurança: repositório montado de propósito ----------
+
+# A verificação roda git status e git fetch em cada projeto, e o git é feito para rodar programas que o próprio projeto
+# escolhe (filtros, ajudantes de credencial, core.sshCommand, core.askPass). Um projeto achado SOZINHO (na pasta do
+# usuário ou na pasta de projetos) cujo config LOCAL traga uma dessas chaves fica de fora da verificação, com um aviso,
+# até a pessoa pedir a pasta dele (folders add). Os ganchos são desligados à parte, no fetch (core.hooksPath vazio).
+
+# 0 se o config do repositório $1 traz uma chave que roda programa: um filtro (filter.<nome>.clean ou .process, que o git
+# status pode rodar ao comparar arquivos), um ajudante de credencial (credential.helper ou credential.<url>.helper, no fetch
+# por HTTPS), core.sshCommand ou core.askPass (no fetch). Só o config do PROJETO, nunca o global: o ajudante de credencial
+# global da pessoa (o gh) precisa continuar funcionando. Por isso lê os dois escopos do projeto, --local (.git/config) e
+# --worktree (.git/config.worktree, que o git respeita com extensions.worktreeConfig e que o --local não mostra; sem essa
+# opção, --worktree é igual a --local). --includes resolve um [include] path=... que esconderia a chave. --name-only tira o
+# =valor, para um = no nome da subseção ([filter "a=b"]) não quebrar o padrão, que casa a chave inteira (^...$). Ler o
+# config não roda programa. O transporte que roda programa (git:// com core.gitProxy, ext::) é barrado no fetch, não aqui.
+gc_repo_unsafe_config() {
+  { git -C "$1" config --local --list --name-only --includes 2>/dev/null
+    git -C "$1" config --worktree --list --name-only --includes 2>/dev/null; } \
+    | LC_ALL=C grep -qiE '^(filter\..*\.(clean|process)|credential\.(.*\.)?helper|core\.(sshcommand|askpass))$'
+}
+
+# Só as pastas pedidas (git-commands folders add), na forma do gc_real_dir, uma por linha. Serve para a segurança: um
+# projeto dentro de uma pasta pedida é escolha da pessoa e não é deixado de fora. A pasta que sumiu do disco é pulada em
+# silêncio (o aviso de pasta que falta é do gc_folders_sources).
+gc_requested_folders() {
+  local pasta real
+  gc_folders_lines "$(gc_home)/folders" | while IFS= read -r pasta; do
+    real=$(gc_real_dir "$pasta") && printf '%s\n' "$real"
+  done
+}
+
+# Passa adiante a lista de caminhos do stdin, menos os projetos achados sozinhos cujo config local roda um programa, que
+# viram um aviso no stderr. Um projeto dentro de (ou igual a) uma pasta pedida é escolha da pessoa e passa sempre. O awk
+# marca cada caminho T (dentro de uma pasta pedida) ou G (achado sozinho) — as pastas pedidas entram antes dos caminhos,
+# separadas por uma linha vazia, como no gc_folders_filter, e no Windows a comparação não diferencia maiúsculas. O git
+# (que não roda em awk) confere só os marcados G, no laço de shell.
+gc_safe_filter() {
+  local win=0 marca r
+  [ "$(gc_os)" = windows ] && win=1
+  { gc_requested_folders; printf '\n'; cat; } | LC_ALL=C awk -v win="$win" '
+    !fim {
+      if ($0 == "") { fim = 1; next }
+      ped[++n] = (win == 1 ? tolower($0) : $0)
+      next
+    }
+    {
+      c = (win == 1 ? tolower($0) : $0)
+      t = 0
+      for (i = 1; i <= n; i++)
+        if (c == ped[i] || index(c, ped[i] "/") == 1) { t = 1; break }
+      print (t ? "T" : "G") "\t" $0
+    }' | while IFS=$'\t' read -r marca r; do
+      [ -n "$r" ] || continue
+      if [ "$marca" = T ] || ! gc_repo_unsafe_config "$r"; then
+        printf '%s\n' "$r"
+      else
+        printf 'git-commands: aviso: projeto fora da verificação por conter configuração que roda programas: %s — para incluir, rode git-commands folders add %s\n' "$r" "$r" >&2
+      fi
+    done
+}
+
 # Todos os projetos que a verificação confere, um caminho por linha, em ordem e sem repetição: os da conta do GitHub na pasta do
 # usuário (só com login, de gc_github_user), os do GitHub na pasta de projetos e os das pastas pedidas (nas pastas escolhidas o dono
 # não importa), menos os que ficam numa pasta ignorada ou dentro dela. Todos os caminhos saem na forma do gc_real_dir, porque a mesma
@@ -278,5 +339,5 @@ gc_all_repos() {
     printf '%s\n' "$fontes" | while IFS= read -r pasta; do
       [ -n "$pasta" ] && real=$(gc_real_dir "$pasta") && gc_updates_repos "$real" </dev/null
     done
-  } | LC_ALL=C sort -u | gc_folders_filter
+  } | LC_ALL=C sort -u | gc_folders_filter | gc_safe_filter
 }

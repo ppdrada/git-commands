@@ -669,3 +669,90 @@ test_lista_pasta_sem_permissao_vira_aviso() {
   assert_eq "$(reais "$HOME/Documents/a" "$SANDBOX/fora/b")" "$out" "as outras fontes seguem"
   assert_eq "git-commands: aviso: sem permissão para ler a pasta: $SANDBOX/fechada" "$(cat "$SANDBOX/err")" "o aviso"
 }
+
+# Segurança: um projeto achado sozinho cujo config local roda um programa fica de fora da verificação, com aviso.
+
+test_seguranca_deixa_fora_config_que_roda_programa() {
+  carrega_libs; export GIT_COMMANDS_GH=/nao/existe GIT_COMMANDS_OS=linux
+  local par chave val r out
+  gc_config_set projects_dir "$SANDBOX/projetos"
+  # Cada chave de config local que roda programa tira o projeto da verificação, com um aviso. Uma por vez, num projeto só.
+  for par in "core.sshCommand ssh-mau" "core.askPass askpass-mau" "credential.helper cred-mau" \
+             "credential.https://github.com.helper cred-mau" "filter.mau.clean prog" "filter.mau.process prog"; do
+    chave=${par%% *}; val=${par##* }
+    rm -rf "$SANDBOX/projetos"; mkdir -p "$SANDBOX/projetos"
+    r=$(make_repo_at "$SANDBOX/projetos/app" teste)
+    git -C "$r" config "$chave" "$val"
+    out=$(gc_all_repos 2>"$SANDBOX/err")
+    assert_eq "" "$out" "[$chave] fica de fora"
+    assert_contains "$(cat "$SANDBOX/err")" "fora da verificação" "[$chave] avisou"
+  done
+  # Chaves que não rodam programa no status/fetch não tiram o projeto (filter.smudge só roda no checkout; required e username não rodam nada).
+  for chave in filter.mau.smudge filter.mau.required credential.username; do
+    rm -rf "$SANDBOX/projetos"; mkdir -p "$SANDBOX/projetos"
+    r=$(make_repo_at "$SANDBOX/projetos/app" teste)
+    git -C "$r" config "$chave" x
+    assert_eq "$(reais "$r")" "$(gc_all_repos 2>/dev/null)" "[$chave] continua na verificação"
+  done
+}
+
+test_seguranca_pasta_pedida_entra() {
+  carrega_libs; export GIT_COMMANDS_GH=/nao/existe GIT_COMMANDS_OS=linux
+  local r out
+  r=$(make_repo_at "$SANDBOX/projetos/app" teste)
+  git -C "$r" config core.sshCommand ssh-mau
+  gc_config_set projects_dir "$SANDBOX/projetos"
+  # Achado sozinho na pasta de projetos: fica de fora, com aviso.
+  out=$(gc_all_repos 2>"$SANDBOX/err")
+  assert_eq "" "$out" "na pasta de projetos: fica de fora"
+  assert_contains "$(cat "$SANDBOX/err")" "fora da verificação" "avisou"
+  # Pedindo a pasta (folders add), o mesmo projeto é escolha da pessoa e entra, sem aviso.
+  gc_cmd_folders add "$SANDBOX/projetos" >/dev/null
+  out=$(gc_all_repos 2>"$SANDBOX/err")
+  assert_eq "$(reais "$r")" "$out" "pasta pedida: entra"
+  assert_eq "" "$(cat "$SANDBOX/err")" "pasta pedida: sem aviso"
+}
+
+test_seguranca_credential_global_nao_exclui() {
+  carrega_libs; export GIT_COMMANDS_GH=/nao/existe GIT_COMMANDS_OS=linux
+  local r out
+  r=$(make_repo_at "$SANDBOX/projetos/app" teste)
+  gc_config_set projects_dir "$SANDBOX/projetos"
+  # Um ajudante de credencial GLOBAL (como o gh auth git-credential da pessoa) não pode tirar o projeto: o fetch de projeto privado depende dele.
+  git config --global credential.helper cred-global
+  out=$(gc_all_repos 2>"$SANDBOX/err")
+  assert_eq "$(reais "$r")" "$out" "credential.helper global: o projeto continua"
+  assert_eq "" "$(cat "$SANDBOX/err")" "sem aviso"
+  # Mas um credential.helper LOCAL no projeto tira.
+  git -C "$r" config credential.helper cred-local
+  assert_eq "" "$(gc_all_repos 2>/dev/null)" "credential.helper local: fica de fora"
+}
+
+test_seguranca_chave_via_include_tambem_tira() {
+  carrega_libs; export GIT_COMMANDS_GH=/nao/existe GIT_COMMANDS_OS=linux
+  local r out
+  r=$(make_repo_at "$SANDBOX/projetos/app" teste)
+  gc_config_set projects_dir "$SANDBOX/projetos"
+  # A chave perigosa escondida atrás de um [include]: o config local só aponta para outro arquivo, que a põe.
+  printf '[core]\n\tsshCommand = ssh-mau\n' > "$r/.git/extra"
+  git -C "$r" config include.path extra
+  out=$(gc_all_repos 2>"$SANDBOX/err")
+  assert_eq "" "$out" "chave via include também tira o projeto"
+  assert_contains "$(cat "$SANDBOX/err")" "fora da verificação" "avisou"
+}
+
+test_seguranca_pega_config_worktree_e_igual_no_nome() {
+  carrega_libs; export GIT_COMMANDS_GH=/nao/existe GIT_COMMANDS_OS=linux
+  local r
+  gc_config_set projects_dir "$SANDBOX/projetos"
+  # Chave perigosa no escopo worktree (.git/config.worktree), que o git respeita mas o --local não mostra.
+  r=$(make_repo_at "$SANDBOX/projetos/wt" teste)
+  git -C "$r" config extensions.worktreeConfig true
+  git -C "$r" config --worktree core.sshCommand ssh-mau
+  assert_eq "" "$(gc_all_repos 2>/dev/null)" "config de worktree: fica de fora"
+  # Chave perigosa com = no nome da subseção ([filter "a=b"]).
+  rm -rf "$SANDBOX/projetos"; mkdir -p "$SANDBOX/projetos"
+  r=$(make_repo_at "$SANDBOX/projetos/eq" teste)
+  git -C "$r" config 'filter.a=b.clean' prog
+  assert_eq "" "$(gc_all_repos 2>/dev/null)" "= no nome da subseção: fica de fora"
+}

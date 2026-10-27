@@ -70,6 +70,15 @@ gc_quiet_net() {
   fi
 }
 
+# Pasta vazia de ganchos. A verificação roda o git fetch com core.hooksPath apontando para cá, então
+# nenhum gancho do projeto roda (o reference-transaction que o fetch dispara ao mexer nas referências,
+# e qualquer outro), nem os de .git/hooks nem um core.hooksPath que o projeto tenha posto no config.
+gc_no_hooks_dir() {
+  local d; d="$(gc_home)/sem-ganchos"
+  mkdir -p "$d" 2>/dev/null
+  gc_real_dir "$d" 2>/dev/null || printf '%s\n' "$d"
+}
+
 # ---------- configuração ----------
 
 gc_config_valid_key() {
@@ -155,14 +164,18 @@ gc_github_ssh_to_https() {
 # plano não precisa da senha da chave SSH. Se o HTTPS falhar (projeto privado sem o login do gh
 # no git), tenta pelo próprio SSH, sem perguntas, como na 1.0.0; estouro de tempo não tenta de novo.
 gc_fetch_origin() {
-  local url https rc
+  local url https rc hooks prot
+  hooks=$(gc_no_hooks_dir)
+  # Só os transportes que a verificação usa (https e ssh; file é dos testes). O git:// roda o core.gitProxy e o ext:: roda um
+  # comando na conexão: fora da lista, ficam barrados, para um origin montado de propósito não rodar programa no fetch.
+  prot="-c protocol.allow=never -c protocol.https.allow=always -c protocol.ssh.allow=always -c protocol.file.allow=always"
   url=$(git -C "$1" config --get remote.origin.url 2>/dev/null)
   if https=$(gc_github_ssh_to_https "$url"); then
-    gc_run_with_timeout "$2" git -C "$1" fetch --prune --quiet "$https" '+refs/heads/*:refs/remotes/origin/*' && return 0
+    gc_run_with_timeout "$2" git -C "$1" $prot -c "core.hooksPath=$hooks" fetch --prune --quiet "$https" '+refs/heads/*:refs/remotes/origin/*' && return 0
     rc=$?
     [ "$rc" -eq 124 ] && return 124
   fi
-  gc_run_with_timeout "$2" git -C "$1" fetch --prune --quiet
+  gc_run_with_timeout "$2" git -C "$1" $prot -c "core.hooksPath=$hooks" fetch --prune --quiet
 }
 
 # 0 se algum remote do repositório aponta (na configuração crua) para o GitHub.
