@@ -75,9 +75,10 @@ push_remote_commit() {
 # gh falso em $SANDBOX/stub/gh, com a mesma saída do gh real nos comandos que o plugin usa.
 # auth status sai com $STUB_GH_AUTH (0 = logado). config get com "user" por último dá o login
 # ($STUB_GH_USER, tester se não existir, vazio se for definida vazia); com outra chave, dá o
-# protocolo ($STUB_GH_PROTOCOL). api user dá o login da API ($STUB_GH_API_USER, tester se não existir);
-# com $STUB_GH_API_ERROR escreve esse texto no stdout e sai com 1, como o gh num erro HTTP (o corpo do erro
-# vai para o stdout, e não para o stderr). Cada chamada fica anotada em $SANDBOX/gh.log, para os testes
+# protocolo ($STUB_GH_PROTOCOL). api user dá o login da API ($STUB_GH_API_USER, tester se não existir), e
+# api meta, duas chaves do servidor do GitHub (as linhas de $STUB_GH_META no lugar delas, se existir). Nos
+# dois, com $STUB_GH_API_ERROR escreve esse texto no stdout e sai com 1, como o gh num erro HTTP (o corpo do
+# erro vai para o stdout, e não para o stderr). Cada chamada fica anotada em $SANDBOX/gh.log, para os testes
 # conferirem se o gh foi chamado.
 make_gh_stub() {
   mkdir -p "$SANDBOX/stub"
@@ -90,7 +91,7 @@ make_gh_stub() {
     '  "auth token") [ -n "${STUB_GH_OFFLINE:-}" ] && { echo gho_teste; exit 0; }; exit "${STUB_GH_AUTH:-0}" ;;' \
     '  "config get") for a; do :; done; if [ "$a" = user ]; then echo "${STUB_GH_USER-tester}"; else echo "${STUB_GH_PROTOCOL:-https}"; fi ;;' \
     '  "config set") exit 0 ;;' \
-    '  "api meta") printf "%s\n" "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=" ;;' \
+    '  "api meta") [ -n "${STUB_GH_API_ERROR:-}" ] && { printf "%s\n" "$STUB_GH_API_ERROR"; printf "%s\n" "gh: Bad credentials (HTTP 401)" >&2; exit 1; }; [ -n "${STUB_GH_META:-}" ] && { printf "%s\n" "$STUB_GH_META"; exit 0; }; printf "%s\n" "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=" ;;' \
     '  "api user") [ -n "${STUB_GH_OFFLINE:-}" ] && { printf "%s\n" "error connecting to api.github.com" "check your internet connection or https://githubstatus.com" >&2; exit 1; }; [ -n "${STUB_GH_API_ERROR:-}" ] && { printf "%s\n" "$STUB_GH_API_ERROR"; printf "%s\n" "gh: Bad credentials (HTTP 401)" >&2; exit 1; }; echo "${STUB_GH_API_USER-tester}" ;;' \
     '  *) exit 1 ;;' \
     'esac' > "$SANDBOX/stub/gh"

@@ -82,8 +82,12 @@ gc_ssh_test() {
 gc_ssh_known_hosts() {
   local gh chaves k kh="$HOME/.ssh/known_hosts" conhecidas="" n=0
   gh=$(gc_gh_bin)
-  if [ -n "$gh" ]; then chaves=$(gc_run_with_timeout 15 "$gh" api meta --jq '.ssh_keys[]' 2>/dev/null); fi
-  [ -n "$chaves" ] || { printf 'git-commands: não consegui buscar as chaves do servidor do GitHub\n' >&2; return 1; }
+  # Num erro HTTP o gh sai com 1 e escreve o corpo do erro no stdout: só vale a saída com código 0
+  # em que toda linha tem a forma de uma chave (tipo e base64). Senão, o known_hosts nem é tocado.
+  if [ -n "$gh" ]; then chaves=$(gc_run_with_timeout 15 "$gh" api meta --jq '.ssh_keys[]' 2>/dev/null) || chaves=""; fi
+  if [ -z "$chaves" ] || printf '%s\n' "$chaves" | grep -qvE '^[a-z0-9@.-]+ AAAA[0-9A-Za-z+/]+={0,2}$'; then
+    printf 'git-commands: não consegui buscar as chaves do servidor do GitHub\n' >&2; return 1
+  fi
   mkdir -p "$HOME/.ssh" || return 1
   chmod 700 "$HOME/.ssh" 2>/dev/null
   # As chaves do github.com que o arquivo já tem, em qualquer formato (tab, nome embaralhado):
