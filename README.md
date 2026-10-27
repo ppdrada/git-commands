@@ -199,6 +199,7 @@ git-commands folders list                              # mostra onde ela procura
 - **Ignorar** serve para o que a busca acha, mas você não quer ver: uma cópia velha ou de backup de um projeto (como `site - Cópia`) ou um projeto antigo esquecido em Downloads. Vale para tudo o que está dentro da pasta ignorada, nos três lugares.
 - No Windows, escreva o caminho com `/` (como `D:/projetos`) ou entre aspas. Nome de pasta com espaço também vai entre aspas. A pasta precisa existir na hora de pedir ou ignorar.
 - Se uma pasta pedida some depois (apagada, disco externo desligado), a verificação escreve um aviso no `~/.git-commands/check.log`, pula essa pasta e segue com as outras.
+- Se um projeto que a busca acha sozinho traz no próprio `.git/config` algo que roda um programa (um filtro, um ajudante de credencial, um comando de SSH ou de senha), a verificação **não mexe nele** e avisa no `check.log` — é uma proteção contra um projeto montado de propósito. Para incluí-lo mesmo assim, peça a pasta dele (`git-commands folders add <pasta>`): aí foi você que escolheu.
 
 O `git-commands folders list` mostra uma linha por lugar: o tipo, a pasta e a situação.
 
@@ -328,6 +329,7 @@ git_protocol=https
 - **Senhas e chaves não vão para o GitHub sem você saber.** Antes do commit e antes do envio, o plugin procura arquivos `.env`, chaves privadas, tokens do GitHub e chaves de API, inclusive em commits que ainda não foram enviados, e pergunta o que fazer.
 - **O login é seu.** Ele acontece no navegador, no site do GitHub, e o `gh` guarda o acesso no cofre do próprio sistema (Gerenciador de Credenciais no Windows, Chaves no macOS). Nunca cole senhas, tokens ou códigos no chat.
 - **E-mail privado.** Na configuração, o plugin sugere o e-mail privado do GitHub (`…@users.noreply.github.com`), para o seu e-mail pessoal não aparecer nos commits públicos.
+- **A verificação automática não roda programas de um projeto.** O git é feito para rodar programas que um projeto escolhe (ganchos, filtros, ajudantes de credencial). Ao conferir cada projeto, a verificação desliga os ganchos e o monitor de arquivos, e deixa de fora um projeto achado sozinho cujo `.git/config` traga um filtro, um ajudante de credencial ou um comando de SSH/senha — até você pedir a pasta dele. Assim um projeto montado de propósito e largado numa pasta sua não roda nada por conta da verificação.
 
 ## Solução de problemas
 

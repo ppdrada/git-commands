@@ -143,6 +143,63 @@ test_scan_nao_roda_o_fsmonitor_do_projeto() {
   return 0
 }
 
+test_scan_nao_roda_o_filtro_do_projeto() {
+  export GIT_COMMANDS_GH=/nao/existe GIT_COMMANDS_OS=linux
+  local r="$SANDBOX/projetos/app" marca="$SANDBOX/filtro-rodou" programa="$SANDBOX/filtro.sh"
+  make_repo_at "$r" teste >/dev/null
+  gc config set projects_dir "$SANDBOX/projetos" >/dev/null
+  # Um filtro clean que roda um programa, ligado pelo .gitattributes a um arquivo. O programa deixa um marcador e deixa o conteúdo passar (cat).
+  printf '%s\n' '#!/bin/sh' ": > \"$marca\"" 'cat' > "$programa"; chmod +x "$programa"
+  printf 'dados.txt filter=mau\n' > "$r/.gitattributes"; printf 'aaaa\n' > "$r/dados.txt"
+  git -C "$r" add .gitattributes dados.txt; git -C "$r" commit -qm "com filtro"
+  git -C "$r" config filter.mau.clean "$programa"
+  # Um git status comum roda o filtro clean para reconferir o arquivo. O conteúdo muda mas o tamanho não (5 bytes), então o git
+  # não decide pelo tamanho e precisa reler o arquivo pelo filtro (marcador aparece).
+  rm -f "$marca"; printf 'bbbb\n' > "$r/dados.txt"; git -C "$r" status >/dev/null 2>&1
+  assert_file "$marca" "um git status comum roda o filtro clean do projeto"
+  # A verificação deixa o projeto de fora (config local roda programa) e nunca o confere: o marcador não aparece, e avisa.
+  rm -f "$marca"; gc updates scan --no-fetch >/dev/null 2>"$SANDBOX/err"
+  [ -e "$marca" ] && fail "a verificação rodou o filtro clean do projeto"
+  assert_contains "$(cat "$SANDBOX/err")" "fora da verificação" "avisou que o projeto ficou de fora"
+  return 0
+}
+
+test_scan_fetch_nao_roda_ganchos_do_projeto() {
+  local a marca="$SANDBOX/gancho-rodou" evil="$SANDBOX/hooks-mau"
+  a=$(make_github_pair app)
+  # Um reference-transaction no .git/hooks e um core.hooksPath local apontando para outra pasta com o mesmo gancho: o fetch roda
+  # um programa ao mexer nas referências.
+  mkdir -p "$evil"
+  printf '%s\n' '#!/bin/sh' ": > \"$marca\"" > "$a/.git/hooks/reference-transaction"; chmod +x "$a/.git/hooks/reference-transaction"
+  # Um git fetch comum roda o gancho do .git/hooks (marcador aparece).
+  push_remote_commit app n.txt um
+  rm -f "$marca"; git -C "$a" fetch --prune --quiet
+  assert_file "$marca" "um git fetch comum roda o reference-transaction do projeto"
+  # A verificação não roda nenhum dos dois ganchos (nem o do .git/hooks nem o do core.hooksPath local).
+  printf '%s\n' '#!/bin/sh' ": > \"$marca\"" > "$evil/reference-transaction"; chmod +x "$evil/reference-transaction"
+  git -C "$a" config core.hooksPath "$evil"
+  push_remote_commit app n.txt dois
+  rm -f "$marca"; gc updates scan --repo "$a" >/dev/null 2>&1
+  [ -e "$marca" ] && fail "a verificação rodou um gancho do projeto no fetch"
+  return 0
+}
+
+test_scan_fetch_bloqueia_transporte_que_roda_programa() {
+  local a="$SANDBOX/projetos/app" marca="$SANDBOX/proxy-rodou" programa="$SANDBOX/proxy.sh"
+  make_repo_at "$a" teste >/dev/null
+  # Um origin git:// (aceito pelo gc_repo_is_github) e um core.gitProxy que roda um programa ao conectar.
+  git -C "$a" remote set-url origin "git://127.0.0.1/x.git"
+  printf '%s\n' '#!/bin/sh' ": > \"$marca\"" > "$programa"; chmod +x "$programa"
+  git -C "$a" config core.gitProxy "$programa"
+  # Com o transporte git:// liberado, um git fetch roda o core.gitProxy ao conectar (marcador aparece).
+  rm -f "$marca"; git -C "$a" -c protocol.git.allow=always fetch --prune --quiet 2>/dev/null || true
+  assert_file "$marca" "o git fetch pelo git:// roda o core.gitProxy"
+  # A verificação barra o transporte git://: o gitProxy não roda.
+  rm -f "$marca"; gc updates scan --repo "$a" >/dev/null 2>&1
+  [ -e "$marca" ] && fail "a verificação rodou o core.gitProxy pelo transporte git://"
+  return 0
+}
+
 test_scan_projeto_ssh_busca_por_https() {
   local a; a=$(make_github_pair app); git -C "$a" remote set-url origin git@github.com:teste/app.git
   push_remote_commit app n.txt "um"
