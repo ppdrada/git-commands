@@ -76,8 +76,11 @@ export function atrasada(arquivos: Arquivos, agora: number): boolean {
   return verificadoEm === null || agora - verificadoEm > 3 * lerConfig(arquivos.config).intervalo * MINUTO
 }
 
-/** `paradaDesde`: desde quando a verificação está atrasada, ou null quando não está. */
-export function resumir(arquivos: Arquivos, agora: number, paradaDesde: number | null): Resumo {
+/**
+ * `paradaDesde`: desde quando a verificação está atrasada, ou null quando não está.
+ * `casa`: a pasta do usuário, que o resumo só guarda para o painel contar a pasta de cada projeto a partir dela.
+ */
+export function resumir(arquivos: Arquivos, agora: number, paradaDesde: number | null, casa: string | null = null): Resumo {
   const { ligada, intervalo } = lerConfig(arquivos.config)
   const motivo = lerErro(arquivos.log)
   let situacao: Situacao = 'ok'
@@ -93,6 +96,7 @@ export function resumir(arquivos: Arquivos, agora: number, paradaDesde: number |
     motivo,
     intervalo,
     visto: agora,
+    casa,
   }
 }
 

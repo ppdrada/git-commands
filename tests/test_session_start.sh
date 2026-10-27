@@ -15,6 +15,7 @@ test_ss_repo_github_injeta_regras() {
 test_ss_respeita_desligado() { local r out; r=$(make_github_pair app); gc proactive off "$r"; out=$(ss "$r"); assert_eq "0" "$?" "o hook rodou"; assert_eq "" "$out" ""; }
 
 test_ss_avisa_novidades_so_com_auto_check() {
+  export GIT_COMMANDS_GH=/nao/existe   # o scan sem --dir pede o login ao gh: o da máquina nunca entra
   gc config set projects_dir "$SANDBOX/projetos"; local a; a=$(make_github_pair app); push_remote_commit app n.txt "um"; gc updates scan --save >/dev/null
   assert_not_contains "$(ss "$SANDBOX")" "Novidades no GitHub" "auto_check desligado"
   gc config set auto_check on; assert_contains "$(ss "$SANDBOX")" "Novidades no GitHub: app (1)." ""
@@ -27,6 +28,7 @@ test_ss_recopia_app_quando_versao_muda() {
 }
 
 test_ss_rapido_e_sem_rede() {
+  export GIT_COMMANDS_GH=/nao/existe   # o scan sem --dir pede o login ao gh: o da máquina nunca entra
   gc config set projects_dir "$SANDBOX/projetos"; gc config set auto_check on; local i; for i in 1 2 3; do make_github_pair "r$i" >/dev/null; done
   gc updates scan --save >/dev/null
   touch -t 202001010000 "$SANDBOX/ref"; for i in 1 2 3; do touch -t 202001010000 "$SANDBOX/projetos/r$i/.git/FETCH_HEAD"; done
@@ -66,6 +68,7 @@ test_ss_cwd_com_barras_invertidas() { local r; r=$(make_github_pair app); [ "$(g
 ss_src() { printf '{"cwd":"%s","source":"%s"}' "$1" "$2" | CLAUDE_PLUGIN_ROOT="$PLUGIN" "$BASH" "$PLUGIN/hooks/run-hook.cmd" session-start; }
 
 test_ss_avisos_so_ao_abrir_ou_limpar() {
+  export GIT_COMMANDS_GH=/nao/existe   # o scan sem --dir pede o login ao gh: o da máquina nunca entra
   gc config set projects_dir "$SANDBOX/projetos"; local a; a=$(make_github_pair app); push_remote_commit app n.txt "um"
   gc updates scan --save >/dev/null; gc config set auto_check on
   printf '%s\n' '2026-10-25 18:00:00 erro 1' >> "$(gc home)/check.log"

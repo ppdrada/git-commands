@@ -50,8 +50,19 @@ gc_doctor_offline() {
   return 1
 }
 
+# Quantas pastas a lista $1 (<home>/folders ou <home>/ignored) tem. Com "faltam" em $2, só as que já não existem no disco.
+gc_doctor_pastas() {
+  gc_folders_lines "$1" | {
+    local pasta n=0
+    while IFS= read -r pasta; do
+      if [ "${2:-}" != faltam ] || [ ! -d "$pasta" ]; then n=$((n + 1)); fi
+    done
+    printf '%s\n' "$n"
+  }
+}
+
 gc_cmd_doctor() {
-  local git_v="" git_ok=no gh gh_v="" gh_on=no gh_auth=no gh_user="" auth_out="" api_out="" api_rc gh_proto="" ssh_pub="" k
+  local git_v="" git_ok=no gh gh_v="" gh_on=no gh_auth=no gh_user="" auth_out="" api_out="" api_rc gh_proto="" ssh_pub="" k h
   if command -v git >/dev/null 2>&1; then
     git_v=$(git --version 2>/dev/null | sed -n 's/^git version //p')
     gc_git_version_ok "$git_v" && git_ok=yes
@@ -62,7 +73,10 @@ gc_cmd_doctor() {
     gh_v=$(gc_run_with_timeout 15 "$gh" --version 2>/dev/null | head -n 1 | sed -n 's/^gh version \([^ ]*\).*/\1/p')
     if auth_out=$(gc_run_with_timeout 15 "$gh" auth status --hostname github.com 2>&1); then
       gh_auth=yes
-      gh_user=$(gc_run_with_timeout 15 "$gh" api user --jq .login 2>/dev/null)
+      # Só vale o login que a API deu com sucesso (num erro HTTP o gh escreve o corpo do erro no stdout e sai com 1) e que tem
+      # forma de login: o resto é como se a API não tivesse respondido, e nem aparece em gh_user nem vai para o config.
+      gh_user=$(gc_run_with_timeout 15 "$gh" api user --jq .login 2>/dev/null) || gh_user=""
+      gc_is_github_login "$gh_user" || gh_user=""
     elif "$gh" auth token >/dev/null 2>&1; then
       # Há um token guardado, mas o login não foi confirmado. Sem internet, o gh auth status só
       # diz que o token é inválido; quem mostra a falta de conexão é uma chamada à API.
@@ -74,6 +88,10 @@ gc_cmd_doctor() {
     gh_proto=$("$gh" config get -h github.com git_protocol 2>/dev/null)
   fi
   k=$(gc_ssh_key) && ssh_pub="$k.pub"
+  # O login que a API confirmou vale mais que o gravado: a pessoa pode ter trocado de conta no gh, e é com o login que a busca na
+  # pasta do usuário reconhece os projetos dela. Se a API não deu um login (sem rede, sem login, erro), o que está gravado fica.
+  if [ -n "$gh_user" ] && [ "$gh_user" != "$(gc_config_get github_user)" ]; then gc_config_set github_user "$gh_user"; fi
+  h=$(gc_home)
   printf 'os=%s\n' "$(gc_os)"
   printf 'git=%s\n' "$git_v"
   printf 'git_ok=%s\n' "$git_ok"
@@ -85,6 +103,10 @@ gc_cmd_doctor() {
   printf 'user_name=%s\n' "$(git config --global user.name 2>/dev/null)"
   printf 'user_email=%s\n' "$(git config --global user.email 2>/dev/null)"
   printf 'projects_dir=%s\n' "$(gc_config_get projects_dir)"
+  printf 'github_user=%s\n' "$(gc_github_user)"
+  printf 'folders=%s\n' "$(gc_doctor_pastas "$h/folders")"
+  printf 'folders_missing=%s\n' "$(gc_doctor_pastas "$h/folders" faltam)"
+  printf 'ignored=%s\n' "$(gc_doctor_pastas "$h/ignored")"
   printf 'auto_check=%s\n' "$(gc_config_get auto_check)"
   printf 'interval=%s\n' "$(gc_config_get interval)"
   printf 'proactive=%s\n' "$(gc_config_get proactive)"

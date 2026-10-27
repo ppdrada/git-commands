@@ -2,6 +2,9 @@
 
 chave() { mkdir -p "$HOME/.ssh"; ssh-keygen -q -t "${2:-ed25519}" -N '' -C teste -f "$HOME/.ssh/$1" >/dev/null; }
 
+# As contagens de projetos que o ssh status mostra (stdin), numa linha só e com um espaço no fim: projetos_https=N projetos_ssh=N
+contagens() { grep '^projetos_' | tr '\n' ' '; }
+
 test_ssh_converte_enderecos() {
   . "$PLUGIN/lib/common.sh"; . "$PLUGIN/lib/ssh.sh"
   assert_eq "git@github.com:a/b.git" "$(gc_github_https_to_ssh https://github.com/a/b.git)" ""
@@ -47,7 +50,7 @@ test_ssh_config_respeita_host_existente() {
 test_ssh_usa_a_chave_que_existe() {
   chave id_rsa rsa; GIT_COMMANDS_OS=linux gc ssh config >/dev/null
   assert_contains "$(cat "$HOME/.ssh/config")" "IdentityFile ~/.ssh/id_rsa" ""
-  assert_contains "$(SSH_AUTH_SOCK= gc ssh status)" "chave=$HOME/.ssh/id_rsa" ""
+  assert_contains "$(SSH_AUTH_SOCK= GIT_COMMANDS_GH=/nao/existe gc ssh status)" "chave=$HOME/.ssh/id_rsa" ""
 }
 
 test_ssh_status_sem_chave_e_sem_agente() {
@@ -55,6 +58,57 @@ test_ssh_status_sem_chave_e_sem_agente() {
   assert_eq "chave impressao agente config known_hosts protocolo projetos_https projetos_ssh " "$(printf '%s\n' "$out" | sed 's/=.*//' | tr '\n' ' ')" ""
   printf '%s\n' "$out" | grep -qx 'chave=' || fail "sem chave"
   printf '%s\n' "$out" | grep -qx 'agente=sem-agente' || fail "sem agente"
+}
+
+# Os projetos de ssh status vêm de todas as fontes (gc_all_repos). Estes testes usam repositórios de make_repo_at, que
+# não têm remoto de verdade: nada vai à rede. GIT_COMMANDS_GH aponta para um caminho que não existe, para o gh logado
+# da máquina nunca entrar, e o login fica no config. Os projetos da pasta do usuário ficam em ~/a e ~/b, e não em
+# ~/Documents: no Mac a busca no usuário pula a Documents.
+
+test_ssh_status_conta_os_projetos_do_usuario() {
+  export GIT_COMMANDS_GH=/nao/existe
+  gc config set github_user teste
+  make_repo_at "$HOME/a" teste >/dev/null; git -C "$HOME/a" remote set-url origin git@github.com:teste/a.git
+  make_repo_at "$HOME/b" teste >/dev/null
+  # De outra conta, não é da pessoa: fica de fora.
+  make_repo_at "$HOME/c" outra-conta >/dev/null
+  # Sem pasta de projetos: os projetos vêm só da pasta do usuário.
+  assert_eq "" "$(gc config get projects_dir)" "sem pasta de projetos"
+  assert_eq "projetos_https=1 projetos_ssh=1 " "$(SSH_AUTH_SOCK= gc ssh status | contagens)" "um em ssh e um em https"
+}
+
+test_ssh_status_conta_todas_as_fontes() {
+  export GIT_COMMANDS_GH=/nao/existe
+  gc config set github_user teste; gc config set projects_dir "$SANDBOX/projetos"
+  # Na pasta do usuário: um em ssh e um em https. Na pasta de projetos e na pasta pedida o dono não importa.
+  make_repo_at "$HOME/a" teste >/dev/null; git -C "$HOME/a" remote set-url origin git@github.com:teste/a.git
+  make_repo_at "$HOME/b" teste >/dev/null
+  make_repo_at "$SANDBOX/projetos/p1" outra-conta >/dev/null
+  make_repo_at "$SANDBOX/projetos/p2" outra-conta >/dev/null; git -C "$SANDBOX/projetos/p2" remote set-url origin ssh://git@ssh.github.com:443/outra-conta/p2.git
+  make_repo_at "$SANDBOX/fora/x" outra-conta >/dev/null
+  make_repo_at "$SANDBOX/fora/velho" outra-conta >/dev/null
+  gc folders add "$SANDBOX/fora" >/dev/null; gc folders ignore "$SANDBOX/fora/velho" >/dev/null
+  # https: b, p1 e x (o velho está ignorado). ssh: a e p2.
+  assert_eq "projetos_https=3 projetos_ssh=2 " "$(SSH_AUTH_SOCK= gc ssh status | contagens)" "a lista inteira, sem as ignoradas"
+}
+
+test_ssh_status_nao_mostra_avisos_nem_erro_da_lista() {
+  export GIT_COMMANDS_GH=/nao/existe
+  local out rc chaves="chave impressao agente config known_hosts protocolo projetos_https projetos_ssh "
+  # Sem login, sem pasta de projetos e sem pastas pedidas, a lista dá erro: as contagens ficam em zero e nada além
+  # das linhas chave=valor aparece, nem no stderr.
+  out=$(SSH_AUTH_SOCK= gc ssh status 2>&1); rc=$?
+  assert_eq "0" "$rc" "sem onde procurar: código"
+  assert_eq "$chaves" "$(printf '%s\n' "$out" | sed 's/=.*//' | tr '\n' ' ')" "sem onde procurar: só as linhas chave=valor"
+  assert_eq "projetos_https=0 projetos_ssh=0 " "$(printf '%s\n' "$out" | contagens)" "sem onde procurar: contagens em zero"
+  # Com os avisos da lista (pasta de projetos e pasta pedida que sumiram), as contagens seguem e os avisos não aparecem.
+  gc config set github_user teste; gc config set projects_dir "$SANDBOX/projetos-que-sumiu"
+  mkdir -p "$SANDBOX/fora/apagada"; gc folders add "$SANDBOX/fora/apagada" >/dev/null; rm -rf "$SANDBOX/fora/apagada"
+  make_repo_at "$HOME/a" teste >/dev/null; git -C "$HOME/a" remote set-url origin git@github.com:teste/a.git
+  out=$(SSH_AUTH_SOCK= gc ssh status 2>&1); rc=$?
+  assert_eq "0" "$rc" "com avisos: código"
+  assert_eq "$chaves" "$(printf '%s\n' "$out" | sed 's/=.*//' | tr '\n' ' ')" "com avisos: só as linhas chave=valor"
+  assert_eq "projetos_https=0 projetos_ssh=1 " "$(printf '%s\n' "$out" | contagens)" "com avisos: as contagens da busca no usuário"
 }
 
 test_ssh_test_traduz_respostas() {

@@ -89,3 +89,44 @@ test_github_ssh_to_https() {
   gc_github_ssh_to_https https://github.com/a/b.git >/dev/null && fail "já é https: devia devolver 1"
   gc_github_ssh_to_https git@gitlab.com:a/b.git >/dev/null && fail "gitlab não é GitHub"; return 0
 }
+
+test_dono_do_endereco() {
+  . "$PLUGIN/lib/common.sh"; local u out rc
+  for u in https://github.com/PPDRADA/site.git https://www.github.com/ppdrada/site https://usuario@github.com/ppdrada/site \
+           git@github.com:ppdrada/site.git ssh://git@github.com/ppdrada/site ssh://git@ssh.github.com:443/ppdrada/site.git \
+           git://github.com/ppdrada/site git@github.com:PPDRADA/site ssh://git@ssh.github.com:443/PPDRADA/site; do
+    out=$(gc_github_owner "$u"); rc=$?
+    assert_eq "0" "$rc" "código de $u"; assert_eq "ppdrada" "$out" "dono de $u"
+  done
+  for u in https://gitlab.com/ppdrada/site https://gitlab.com/github.com/x "qualquer coisa" "" https://github.com/ \
+           https://github.com.exemplo.com/ppdrada/site git@gitlab.com:ppdrada/site.git ssh://git@exemplo.com/github.com/ppdrada/site.git; do
+    out=$(gc_github_owner "$u"); rc=$?
+    assert_eq "1" "$rc" "código de [$u]"; assert_eq "" "$out" "não devia imprimir nada para [$u]"
+  done
+}
+
+test_forma_de_login_do_github() {
+  . "$PLUGIN/lib/common.sh"; local u
+  # Letras, números, - e _ (as contas de empresa têm _), começando por letra ou número, em qualquer caixa.
+  for u in ppdrada PPDRADA Teste teste-dois a 7 a1-b2 monalisa_octo A_b-c; do
+    gc_is_github_login "$u" || fail "devia aceitar [$u]"
+  done
+  # Vazio, o corpo de um erro (uma ou várias linhas), duas linhas, espaço, ponto, barra, ! e começo com - ou _ não são login.
+  for u in "" "{" $'a\nb' $'{\n  "message": "Bad credentials",\n  "status": "401"\n}' "dois nomes" " a" "a.b" "a/b" "ppdrada!" "-x" "_x"; do
+    gc_is_github_login "$u" && fail "não devia aceitar [$u]"
+  done; return 0
+}
+
+test_caminho_real_da_pasta() {
+  . "$PLUGIN/lib/common.sh"; local r out re='^[A-Za-z]:/'
+  r=$(gc_real_dir "$SANDBOX/home"); assert_eq "0" "$?" "a pasta existe"
+  assert_eq "$r" "$(gc_real_dir "$SANDBOX/home/")" "com e sem a barra no fim"
+  assert_eq "$r" "$(gc_real_dir "$SANDBOX/home/../home")" "o caminho vem resolvido"
+  if [ "$(gc_os)" = windows ]; then
+    [[ $r =~ $re ]] || fail "no Windows o caminho devia começar com a letra da unidade (C:/...), veio [$r]"
+  else
+    assert_eq "$(cd "$SANDBOX/home" && pwd -P)" "$r" "fora do Windows é o pwd -P"
+  fi
+  out=$(gc_real_dir "$SANDBOX/nao/existe"); assert_eq "1" "$?" "pasta que não existe"; assert_eq "" "$out" "não imprime nada"
+  : > "$SANDBOX/arquivo"; assert_exit 1 gc_real_dir "$SANDBOX/arquivo"
+}

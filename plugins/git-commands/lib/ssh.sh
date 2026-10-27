@@ -38,7 +38,7 @@ gc_github_https_to_ssh() {
 }
 
 gc_ssh_status() {
-  local k fp="" lista rc agente cfg=nao kh=nao gh proto="" dir repos r url https=0 sshn=0
+  local k fp="" lista rc agente cfg=nao kh=nao gh proto="" repos r url https=0 sshn=0
   k=$(gc_ssh_key) || k=""
   [ -n "$k" ] && fp=$(ssh-keygen -lf "$k.pub" 2>/dev/null | awk '{print $2}')
   lista=$("$(gc_ssh_add_cmd)" -l 2>/dev/null); rc=$?
@@ -49,16 +49,15 @@ gc_ssh_status() {
   [ -f "$HOME/.ssh/known_hosts" ] && ssh-keygen -F github.com -f "$HOME/.ssh/known_hosts" >/dev/null 2>&1 && kh=sim
   gh=$(gc_gh_bin)
   [ -n "$gh" ] && proto=$("$gh" config get -h github.com git_protocol 2>/dev/null)
-  dir=$(gc_config_get projects_dir)
-  if [ -n "$dir" ] && [ -d "$dir" ]; then
-    repos=$(gc_updates_repos "$dir")
-    local IFS=$'\n'
-    for r in $repos; do
-      url=$(git -C "$r" config --get remote.origin.url 2>/dev/null)
-      if gc_github_ssh_to_https "$url" >/dev/null; then sshn=$((sshn + 1))
-      elif gc_is_github_url "$url"; then https=$((https + 1)); fi
-    done
-  fi
+  # Os projetos de toda a lista que a verificação confere: pasta do usuário, pasta de projetos e pastas pedidas. Os avisos e o
+  # erro dela (stderr) não entram nestas linhas chave=valor, e sem lugar onde procurar (código 1) as contagens ficam em 0.
+  repos=$(gc_all_repos 2>/dev/null) || repos=""
+  local IFS=$'\n'
+  for r in $repos; do
+    url=$(git -C "$r" config --get remote.origin.url 2>/dev/null)
+    if gc_github_ssh_to_https "$url" >/dev/null; then sshn=$((sshn + 1))
+    elif gc_is_github_url "$url"; then https=$((https + 1)); fi
+  done
   printf 'chave=%s\nimpressao=%s\nagente=%s\nconfig=%s\nknown_hosts=%s\nprotocolo=%s\nprojetos_https=%s\nprojetos_ssh=%s\n' \
     "$k" "$fp" "$agente" "$cfg" "$kh" "${proto:-https}" "$https" "$sshn"
 }

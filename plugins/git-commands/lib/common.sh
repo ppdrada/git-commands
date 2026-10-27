@@ -9,7 +9,7 @@ case "${BASH_SOURCE[0]}" in
 esac
 GC_ROOT="$(cd "$GC_LIB_DIR/.." && pwd)"
 
-GC_CONFIG_KEYS="projects_dir auto_check interval proactive auto_check_asked"
+GC_CONFIG_KEYS="projects_dir auto_check interval proactive auto_check_asked github_user"
 
 # ---------- estado e ambiente ----------
 
@@ -116,6 +116,29 @@ gc_is_github_url() {
   [[ $u =~ $re ]]
 }
 
+# O começo de um endereço do GitHub que vem antes do dono, numa ERE só, para o endereço já em minúsculas: o dono é o que
+# vem depois dele, até a primeira /. O gc_github_owner e a busca na pasta do usuário (o awk do gc_home_repos) usam esta
+# mesma variável, para os dois concordarem sempre sobre quem é o dono.
+GC_GITHUB_OWNER_RE='^(https?://([^/@]+@)?(www\.)?github\.com(:[0-9]+)?/|[^/@:]+@github\.com:|ssh://([^/@]+@)?(ssh\.)?github\.com(:[0-9]+)?/|git://github\.com/)'
+
+# Dono, em minúsculas, de um endereço do GitHub: https://github.com/dono/repo (com ou sem www. e
+# usuário), git@github.com:dono/repo, ssh://git@github.com/dono/repo (ou ssh.github.com pela
+# porta 443) e git://github.com/dono/repo. Código 1, sem imprimir nada, para qualquer outro.
+gc_github_owner() {
+  local u resto dono
+  u=$(printf '%s' "$1" | tr 'A-Z' 'a-z')
+  [[ $u =~ $GC_GITHUB_OWNER_RE ]] || return 1
+  resto=${u#"${BASH_REMATCH[0]}"}; dono=${resto%%/*}
+  [ -n "$dono" ] || return 1
+  printf '%s\n' "$dono"
+}
+
+# 0 se $1 tem forma de login do GitHub: letras, números, - e _ (as contas de empresa têm _), começando por letra ou número.
+gc_is_github_login() {
+  local re='^[A-Za-z0-9][A-Za-z0-9_-]*$'
+  [[ $1 =~ $re ]]
+}
+
 # Endereço HTTPS equivalente a um endereço SSH do GitHub (git@github.com:dono/repo,
 # ssh://git@github.com/dono/repo, ssh://git@ssh.github.com:443/dono/repo). Código 1 para o resto.
 gc_github_ssh_to_https() {
@@ -152,6 +175,13 @@ gc_repo_is_github() {
 }
 
 gc_norm_path() { local bs='\'; printf '%s\n' "${1//"$bs"//}"; }
+
+# Caminho real de uma pasta que existe: C:/... no Git Bash (pwd -W), o caminho físico nos outros
+# sistemas (pwd -P). Código 1, sem imprimir nada, se a pasta não existe.
+gc_real_dir() {
+  [ -d "$1" ] || return 1
+  ( CDPATH= cd -- "$1" >/dev/null 2>&1 && { pwd -W 2>/dev/null || pwd -P; } )
+}
 
 # Topo do repositório que contém o caminho (o caminho pode ainda não existir).
 gc_toplevel() {

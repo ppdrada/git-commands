@@ -16,7 +16,15 @@ import {
   temNovidadeNova,
 } from './resumo'
 import type { Arquivos } from './resumo'
-import { cabecalhoDoPainel, corDoEstado, linhaDeStatus, listaDeNovidades, PERGUNTA, rotuloDoEstado } from './textos'
+import {
+  cabecalhoDoPainel,
+  corDoEstado,
+  linhaDeStatus,
+  listaDeNovidades,
+  pastaDoProjeto,
+  PERGUNTA,
+  rotuloDoEstado,
+} from './textos'
 
 const MINUTO = 60_000
 const PAINEL = 'painel'
@@ -26,11 +34,16 @@ const parada = atom({ plugin: 'git-commands-painel', key: 'parada' } as const, n
 const escondidas = atom({ plugin: 'git-commands-painel', key: 'escondidas' } as const, null)
 const avisado = atom({ plugin: 'git-commands-painel', key: 'avisado' } as const, null)
 
-/** A mesma pasta que o bash usa: GIT_COMMANDS_HOME, senão ~/.git-commands (no Windows, o HOME pode faltar). */
+/** A pasta do usuário: o HOME ou, sem ele (no Windows, o HOME pode faltar), o USERPROFILE. */
+async function pastaDoUsuario($: EngineInterface): Promise<string | null> {
+  return (await $.env.get('HOME')) || (await $.env.get('USERPROFILE')) || null
+}
+
+/** A mesma pasta que o bash usa: GIT_COMMANDS_HOME, senão ~/.git-commands. */
 async function pastaDoGitCommands($: EngineInterface): Promise<string | undefined> {
   const propria = await $.env.get('GIT_COMMANDS_HOME')
   if (propria) return propria
-  const casa = (await $.env.get('HOME')) || (await $.env.get('USERPROFILE'))
+  const casa = await pastaDoUsuario($)
   return casa ? `${casa}/.git-commands` : undefined
 }
 
@@ -77,7 +90,7 @@ async function atualizar($: EngineInterface): Promise<void> {
     const depois = desde === null ? null : { verificadoEm, desde }
     if (JSON.stringify(antes) !== JSON.stringify(depois)) await update($, parada, () => depois)
 
-    const novo = resumir(arquivos, agora, desde)
+    const novo = resumir(arquivos, agora, desde, await pastaDoUsuario($))
     await update($, resumo, () => novo)
     await avisarNovidades($, novo)
 
@@ -158,14 +171,22 @@ export const register: Register = on => {
         <Text dimColor>{cabecalhoDoPainel(atual)}</Text>
         {atual.projetos.length > 0 && (
           <Box flexDirection="column">
-            {ordenarParaOPainel(atual.projetos).map(p => (
-              <Text color={corDoEstado(p.estado)}>
-                {p.nome} ({p.branch}): {rotuloDoEstado(p)}
-              </Text>
-            ))}
+            {ordenarParaOPainel(atual.projetos).map(p => {
+              // A pasta vai em cinza, antes do nome e com um espaço entre os dois (o gap).
+              // Direto na pasta do usuário ela é vazia e some, e a linha fica só com o nome.
+              const pasta = pastaDoProjeto(p.caminho, atual.casa)
+              return (
+                <Box gap={1}>
+                  {pasta !== '' && <Text dimColor>{pasta}</Text>}
+                  <Text color={corDoEstado(p.estado)}>
+                    {p.nome} ({p.branch}): {rotuloDoEstado(p)}
+                  </Text>
+                </Box>
+              )
+            })}
           </Box>
         )}
-        {semProjetos && <Text dimColor>Nenhum projeto do GitHub na pasta de projetos.</Text>}
+        {semProjetos && <Text dimColor>Nenhum projeto do GitHub encontrado.</Text>}
         {comNovidades(atual.projetos).length > 0 && (
           <Text dimColor>Para ver e atualizar, peça ao Claude: "{PERGUNTA}"</Text>
         )}

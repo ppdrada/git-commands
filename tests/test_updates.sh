@@ -28,8 +28,60 @@ test_scan_estados_estranhos() {
 test_scan_remote_inacessivel_vira_erro() { local r; r=$(make_github_pair caiu); rm -rf "$SANDBOX/remotes/caiu.git"; assert_contains "$(linha caiu)" "erro" ""; }
 
 test_scan_sem_pasta_configurada() {
+  export GIT_COMMANDS_GH=/nao/existe   # o gh logado da máquina ligaria a busca no usuário
   local err; err=$(gc updates scan 2>&1); assert_eq "1" "$?" ""
-  assert_contains "$err" "pasta de projetos" "explica o que falta"
+  assert_contains "$err" "não há onde procurar projetos" "explica o que falta"
+}
+
+# Os testes da lista de projetos montam a pasta do usuário do sandbox ($HOME), a pasta de projetos e uma pasta pedida. Os repositórios
+# de make_repo_at não têm remoto de verdade, então a verificação roda com --no-fetch: nada vai à rede. O sistema é o Linux porque no
+# Mac a busca no usuário pula a Documents.
+
+test_scan_usa_a_lista() {
+  export GIT_COMMANDS_GH=/nao/existe GIT_COMMANDS_OS=linux
+  local out
+  gc config set github_user teste; gc config set projects_dir "$SANDBOX/projetos"
+  make_repo_at "$HOME/Documents/a" teste >/dev/null
+  make_github_pair app >/dev/null
+  make_repo_at "$SANDBOX/fora/b" outra-conta >/dev/null
+  gc folders add "$SANDBOX/fora" >/dev/null
+  # Sem --dir: os projetos das três fontes, a pasta do usuário, a pasta de projetos e a pasta pedida.
+  out=$(gc updates scan --no-fetch); assert_eq "0" "$?" "sem --dir: código"
+  assert_eq "3" "$(printf '%s\n' "$out" | grep -c .)" "sem --dir: três linhas"
+  assert_eq "1" "$(printf '%s\n' "$out" | grep -c '	a	')" "sem --dir: o da pasta do usuário"
+  assert_eq "1" "$(printf '%s\n' "$out" | grep -c '	app	')" "sem --dir: o da pasta de projetos"
+  assert_eq "1" "$(printf '%s\n' "$out" | grep -c '	b	')" "sem --dir: o da pasta pedida"
+  # Com --dir: só os daquela pasta.
+  out=$(gc updates scan --no-fetch --dir "$SANDBOX/projetos"); assert_eq "0" "$?" "--dir: código"
+  assert_eq "1" "$(printf '%s\n' "$out" | grep -c .)" "--dir: uma linha"
+  assert_contains "$out" "	app	" "--dir: o da pasta"
+}
+
+test_scan_segue_com_aviso_quando_uma_pasta_falta() {
+  . "$PLUGIN/lib/common.sh"; export GIT_COMMANDS_GH=/nao/existe
+  local out rc real h; h=$(gc home)
+  make_github_pair app >/dev/null; gc config set projects_dir "$SANDBOX/projetos"
+  mkdir -p "$SANDBOX/fora/apagada"; gc folders add "$SANDBOX/fora/apagada" >/dev/null
+  real=$(gc_real_dir "$SANDBOX/fora/apagada"); rm -rf "$SANDBOX/fora/apagada"
+  # Uma pasta pedida some: o aviso vai para o stderr (o agendador o põe no check.log), a verificação segue e termina bem.
+  out=$(gc updates scan --no-fetch --save 2>"$SANDBOX/err"); rc=$?
+  assert_eq "0" "$rc" "código"
+  assert_contains "$out" "	app	" "o projeto da pasta de projetos"
+  assert_eq "git-commands: aviso: a pasta pedida não foi encontrada: $real" "$(cat "$SANDBOX/err")" "o aviso"
+  assert_contains "$(cat "$h/status.tsv")" "	app	" "o resultado foi salvo"
+  assert_file "$h/status.time" "a hora da verificação foi salva"
+}
+
+test_scan_sem_fonte_nenhuma_nao_grava_o_status() {
+  export GIT_COMMANDS_GH=/nao/existe
+  local err rc h; h=$(gc home)
+  printf '%s\n' "velho" > "$h/status.tsv"; echo 100 > "$h/status.time"
+  # Sem login, sem pasta de projetos e sem pastas pedidas: erro, e o resultado da última verificação continua como estava.
+  err=$(gc updates scan --save 2>&1); rc=$?
+  assert_eq "1" "$rc" "código"
+  assert_contains "$err" "não há onde procurar projetos" "explica o que falta"
+  assert_eq "velho" "$(cat "$h/status.tsv")" "o status.tsv não mudou"
+  assert_eq "100" "$(cat "$h/status.time")" "o status.time não mudou"
 }
 
 test_scan_pasta_sem_permissao_vira_erro() {
@@ -42,6 +94,7 @@ test_scan_pasta_sem_permissao_vira_erro() {
 }
 
 test_save_e_news() {
+  export GIT_COMMANDS_GH=/nao/existe   # o scan sem --dir pede o login ao gh: o da máquina nunca entra
   gc config set projects_dir "$SANDBOX/projetos"; local a; a=$(make_github_pair atras); push_remote_commit atras n.txt "um"
   gc updates scan --save >/dev/null; assert_contains "$(gc updates news)" "atras	1	" ""
   gc updates pull "$a" >/dev/null; assert_exit 1 gc updates news
@@ -72,6 +125,22 @@ test_scan_nao_mexe_no_index() {
   local antes; antes=$(cksum < "$a/.git/index")
   gc updates scan --no-fetch --dir "$SANDBOX/projetos" >/dev/null
   assert_eq "$antes" "$(cksum < "$a/.git/index")" "a varredura reescreveu o index (pode pegar o index.lock da pessoa)"
+}
+
+test_scan_nao_roda_o_fsmonitor_do_projeto() {
+  local r="$SANDBOX/projetos/app" marca="$SANDBOX/fsmonitor-rodou" programa="$SANDBOX/fsmonitor.sh"
+  make_repo_at "$r" teste >/dev/null
+  # Um repositório achado pela busca pode trazer um core.fsmonitor que roda um programa. Aqui o programa só deixa um marcador.
+  printf '%s\n' '#!/bin/sh' ": > \"$marca\"" > "$programa"; chmod +x "$programa"
+  git -C "$r" config core.fsmonitor "$programa"
+  # O git só consulta o programa quando o index tem a extensão do fsmonitor: um git status comum a grava, e o marcador mostra
+  # que este git roda mesmo o programa.
+  git -C "$r" status >/dev/null 2>&1
+  assert_file "$marca" "um git status comum roda o programa do core.fsmonitor"
+  rm -f "$marca"
+  gc updates scan --no-fetch --repo "$r" >/dev/null
+  [ -e "$marca" ] && fail "a verificação rodou o programa do core.fsmonitor do projeto"
+  return 0
 }
 
 test_scan_projeto_ssh_busca_por_https() {
@@ -119,6 +188,7 @@ test_pull_head_destacado_conta_commits_soltos() {
 }
 
 test_pull_atualiza_a_linha_salva() {
+  export GIT_COMMANDS_GH=/nao/existe   # o scan sem --dir pede o login ao gh: o da máquina nunca entra
   gc config set projects_dir "$SANDBOX/projetos"
   make_github_pair emdia >/dev/null
   local a; a=$(make_github_pair atras); push_remote_commit atras n.txt "um"

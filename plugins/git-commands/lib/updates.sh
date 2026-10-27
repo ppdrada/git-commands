@@ -25,10 +25,13 @@ gc_updates_fetch() {
 }
 
 # Uma linha: caminho, nome, branch, ahead, behind, alterados, estado.
+# O status roda com o core.fsmonitor vazio: um repositório achado pela busca pode trazer um core.fsmonitor que roda um
+# programa. Vazio, e não false, porque antes do Git 2.36 o valor é o caminho de um programa, e false rodaria o programa
+# false; o vazio desliga nas duas versões.
 gc_updates_line() {
   local r=$1 fetch=$2 name branch ahead=0 behind=0 dirty state="" counts
   name=${r##*/}
-  dirty=$(GIT_OPTIONAL_LOCKS=0 git -C "$r" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+  dirty=$(GIT_OPTIONAL_LOCKS=0 git -C "$r" -c core.fsmonitor= status --porcelain 2>/dev/null | wc -l | tr -d ' ')
   branch=$(git -C "$r" symbolic-ref --short -q HEAD 2>/dev/null) || branch=""
   if ! git -C "$r" rev-parse -q --verify HEAD >/dev/null 2>&1; then
     state=sem-commits
@@ -56,7 +59,7 @@ gc_updates_line() {
 }
 
 gc_updates_scan() {
-  local fetch=yes save=no dir="" repo="" top out h
+  local fetch=yes save=no dir="" repo="" top out h repos
   while [ $# -gt 0 ]; do
     case "$1" in
       --no-fetch) fetch=no ;;
@@ -74,12 +77,18 @@ gc_updates_scan() {
     gc_updates_line "$top" "$fetch"
     return 0
   fi
-  [ -n "$dir" ] || dir=$(gc_config_get projects_dir)
-  [ -n "$dir" ] || { printf 'git-commands: a pasta de projetos não está configurada (use a skill configurar ou --dir <pasta>)\n' >&2; return 1; }
-  [ -d "$dir" ] || { printf 'git-commands: a pasta de projetos não existe: %s\n' "$dir" >&2; return 1; }
-  # No macOS, tarefas em segundo plano podem ser proibidas de ler pastas como Documentos.
-  ls "$dir" >/dev/null 2>&1 || { printf 'git-commands: sem permissão para ler a pasta de projetos: %s\n' "$dir" >&2; return 1; }
-  out=$(gc_updates_repos "$dir" | while IFS= read -r r; do gc_updates_line "$r" "$fetch"; done)
+  if [ -n "$dir" ]; then
+    # Com --dir, só aquela pasta.
+    [ -d "$dir" ] || { printf 'git-commands: a pasta de projetos não existe: %s\n' "$dir" >&2; return 1; }
+    # No macOS, tarefas em segundo plano podem ser proibidas de ler pastas como Documentos.
+    ls "$dir" >/dev/null 2>&1 || { printf 'git-commands: sem permissão para ler a pasta de projetos: %s\n' "$dir" >&2; return 1; }
+    repos=$(gc_updates_repos "$dir")
+  else
+    # Sem --dir, todos os projetos: pasta do usuário, pasta de projetos e pastas pedidas. Os avisos dela vão para o stderr (o
+    # agendador os põe no check.log), e a falta de lugar onde procurar é erro.
+    repos=$(gc_all_repos) || return 1
+  fi
+  out=$(printf '%s\n' "$repos" | while IFS= read -r r; do [ -z "$r" ] || gc_updates_line "$r" "$fetch"; done)
   [ -z "$out" ] || printf '%s\n' "$out"
   if [ "$save" = yes ]; then
     h=$(gc_home)

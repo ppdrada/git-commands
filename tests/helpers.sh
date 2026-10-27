@@ -23,11 +23,13 @@ native_path() {
   if (cd "$1" && pwd -W) >/dev/null 2>&1; then (cd "$1" && pwd -W); else (cd "$1" && pwd); fi
 }
 
-# Sandbox novo por teste: HOME, gitconfig global e pastas próprios.
+# Sandbox novo por teste: HOME, gitconfig global e pastas próprios. A pasta de configuração do gh (GH_CONFIG_DIR) também
+# fica no sandbox: no Windows o gh guarda o login fora do HOME (em %APPDATA%), e um teste que chamasse o gh da máquina leria ou
+# gravaria o login de verdade.
 gc_sandbox() {
   SANDBOX="$(mktemp -d "${GC_TEST_TMP:-${TMPDIR:-/tmp}}/sandbox.XXXXXX")"
   export SANDBOX
-  export HOME="$SANDBOX/home"
+  export HOME="$SANDBOX/home" GH_CONFIG_DIR="$SANDBOX/gh"
   mkdir -p "$HOME" "$SANDBOX/projetos" "$SANDBOX/remotes"
   unset GIT_COMMANDS_HOME GIT_COMMANDS_OS GIT_COMMANDS_GH GIT_COMMANDS_GH_DIRS GIT_COMMANDS_SCHEDULE_DRY_RUN
   export GIT_CONFIG_GLOBAL="$SANDBOX/gitconfig"
@@ -71,18 +73,25 @@ push_remote_commit() {
 }
 
 # gh falso em $SANDBOX/stub/gh, com a mesma saída do gh real nos comandos que o plugin usa.
-# auth status sai com $STUB_GH_AUTH (0 = logado).
+# auth status sai com $STUB_GH_AUTH (0 = logado). config get com "user" por último dá o login
+# ($STUB_GH_USER, tester se não existir, vazio se for definida vazia); com outra chave, dá o
+# protocolo ($STUB_GH_PROTOCOL). api user dá o login da API ($STUB_GH_API_USER, tester se não existir);
+# com $STUB_GH_API_ERROR escreve esse texto no stdout e sai com 1, como o gh num erro HTTP (o corpo do erro
+# vai para o stdout, e não para o stderr). Cada chamada fica anotada em $SANDBOX/gh.log, para os testes
+# conferirem se o gh foi chamado.
 make_gh_stub() {
   mkdir -p "$SANDBOX/stub"
   printf '%s\n' '#!/usr/bin/env bash' \
+    "log=\"$SANDBOX/gh.log\"" \
+    'printf "%s\n" "$*" >> "$log"' \
     'case "$1 $2" in' \
     '  "--version "*) printf "gh version 2.62.0 (2024-11-14)\nhttps://github.com/cli/cli/releases/tag/v2.62.0\n" ;;' \
     '  "auth status") [ -n "${STUB_GH_OFFLINE:-}" ] && printf "%s\n" "X Failed to log in to github.com account tester (keyring)" "- The token in keyring is invalid." "- To re-authenticate, run: gh auth refresh -h github.com" >&2; exit "${STUB_GH_AUTH:-0}" ;;' \
     '  "auth token") [ -n "${STUB_GH_OFFLINE:-}" ] && { echo gho_teste; exit 0; }; exit "${STUB_GH_AUTH:-0}" ;;' \
-    '  "config get") echo "${STUB_GH_PROTOCOL:-https}" ;;' \
+    '  "config get") for a; do :; done; if [ "$a" = user ]; then echo "${STUB_GH_USER-tester}"; else echo "${STUB_GH_PROTOCOL:-https}"; fi ;;' \
     '  "config set") exit 0 ;;' \
     '  "api meta") printf "%s\n" "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=" ;;' \
-    '  "api user") [ -n "${STUB_GH_OFFLINE:-}" ] && { printf "%s\n" "error connecting to api.github.com" "check your internet connection or https://githubstatus.com" >&2; exit 1; }; echo tester ;;' \
+    '  "api user") [ -n "${STUB_GH_OFFLINE:-}" ] && { printf "%s\n" "error connecting to api.github.com" "check your internet connection or https://githubstatus.com" >&2; exit 1; }; [ -n "${STUB_GH_API_ERROR:-}" ] && { printf "%s\n" "$STUB_GH_API_ERROR"; printf "%s\n" "gh: Bad credentials (HTTP 401)" >&2; exit 1; }; echo "${STUB_GH_API_USER-tester}" ;;' \
     '  *) exit 1 ;;' \
     'esac' > "$SANDBOX/stub/gh"
   chmod +x "$SANDBOX/stub/gh"
@@ -112,5 +121,19 @@ make_local_repo() {
   printf '# %s\n' "$1" > "$r/README.md"
   git -C "$r" add README.md
   git -C "$r" commit -qm "Primeiro commit"
+  printf '%s\n' "$r"
+}
+
+# Repositório com um commit em <caminho> e origin em https://github.com/<dono>/<nome>.git, sem
+# remoto de verdade. O nome padrão é o último pedaço do caminho. Imprime o caminho.
+make_repo_at() {
+  local r=${1%/} dono=$2 nome
+  nome=${3:-${r##*/}}
+  mkdir -p "$r"
+  git init -q -b main "$r"
+  printf '# %s\n' "$nome" > "$r/README.md"
+  git -C "$r" add README.md
+  git -C "$r" commit -qm "Primeiro commit"
+  git -C "$r" remote add origin "https://github.com/$dono/$nome.git"
   printf '%s\n' "$r"
 }

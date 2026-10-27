@@ -27,6 +27,8 @@ export type Resumo = {
   intervalo: number
   /** quando este resumo foi feito, em milissegundos */
   visto: number
+  /** a pasta do usuário (o HOME ou, sem ele, o USERPROFILE), de onde o painel conta a pasta de cada projeto */
+  casa: string | null
 }
 
 declare module 'claude-code' {
