@@ -20,6 +20,7 @@ import {
   cabecalhoDoPainel,
   corDoEstado,
   linhaDeStatus,
+  linhaForaDaVerificacao,
   listaDeNovidades,
   pastaDoProjeto,
   PERGUNTA,
@@ -169,6 +170,7 @@ export const register: Register = on => {
     return (
       <Box flexDirection="column" gap={1}>
         <Text dimColor>{cabecalhoDoPainel(atual)}</Text>
+        {atual.foraDaVerificacao > 0 && <Text color="warning">{linhaForaDaVerificacao(atual.foraDaVerificacao)}</Text>}
         {atual.projetos.length > 0 && (
           <Box flexDirection="column">
             {ordenarParaOPainel(atual.projetos).map(p => {

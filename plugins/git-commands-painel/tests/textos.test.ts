@@ -5,6 +5,7 @@ import {
   corDoEstado,
   haQuanto,
   linhaDeStatus,
+  linhaForaDaVerificacao,
   listaDeNovidades,
   pastaDoProjeto,
   PERGUNTA,
@@ -26,6 +27,7 @@ function resumo(mudancas: Partial<Resumo> = {}): Resumo {
     projetos: [],
     verificadoEm: AGORA - 5 * MINUTO,
     motivo: null,
+    foraDaVerificacao: 0,
     intervalo: 30,
     visto: AGORA,
     casa: null,
@@ -180,6 +182,15 @@ test('cabeçalho do painel para cada situação', () => {
   expect(cabecalhoDoPainel(resumo({ situacao: 'esperando', verificadoEm: null }))).toBe('Esperando a primeira verificação.')
   expect(cabecalhoDoPainel(resumo({ situacao: 'esperando', verificadoEm: AGORA - 4 * HORA }))).toBe(
     'Esperando a próxima verificação. A última foi há 4 horas.',
+  )
+})
+
+test('a linha de projetos fora da verificação, no singular e no plural', () => {
+  expect(linhaForaDaVerificacao(1)).toBe(
+    '1 projeto fora da verificação por segurança — veja o check.log ou use git-commands folders add',
+  )
+  expect(linhaForaDaVerificacao(3)).toBe(
+    '3 projetos fora da verificação por segurança — veja o check.log ou use git-commands folders add',
   )
 })
 

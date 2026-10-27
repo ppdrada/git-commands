@@ -55,6 +55,11 @@ export function rotuloDoEstado(projeto: Projeto): string {
   }
 }
 
+/** A linha do painel quando a verificação deixou projetos de fora por segurança. É um aviso, não um erro. */
+export function linhaForaDaVerificacao(n: number): string {
+  return `${plural(n, 'projeto', 'projetos')} fora da verificação por segurança — veja o check.log ou use git-commands folders add`
+}
+
 export function corDoEstado(estado: string): 'warning' | 'error' | 'success' | undefined {
   if (estado === 'novidades' || estado === 'divergiu') return 'warning'
   if (estado === 'erro' || estado === 'ocupado') return 'error'

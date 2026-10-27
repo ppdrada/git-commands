@@ -70,6 +70,20 @@ export function lerErro(texto?: string): string | null {
   return antes?.startsWith('git-commands: ') ? antes.slice('git-commands: '.length) : `código ${codigo[1]}`
 }
 
+/**
+ * Quantos projetos a última verificação deixou de fora por segurança: o aviso "projeto fora da verificação",
+ * de um projeto achado sozinho cujo config roda um programa. Não é erro. O check.log acumula e cada rodada
+ * termina em "verificação ok" ou "erro N", então conta só o último bloco, para não somar o mesmo projeto toda vez.
+ */
+export function lerForaDaVerificacao(texto?: string): number {
+  const cheias = linhas(texto).filter(linha => linha.trim() !== '')
+  const fins = cheias.flatMap((linha, i) => (/(?:verificação ok| erro \d+)$/.test(linha) ? [i] : []))
+  const penultimo = fins.at(-2)
+  const inicio = penultimo === undefined ? 0 : penultimo + 1
+  const fim = fins.at(-1) ?? cheias.length
+  return cheias.slice(inicio, fim).filter(linha => linha.includes('fora da verificação')).length
+}
+
 /** Sem status.time, ou com ele mais velho que 3 intervalos. */
 export function atrasada(arquivos: Arquivos, agora: number): boolean {
   const verificadoEm = lerHora(arquivos.time)
@@ -94,6 +108,7 @@ export function resumir(arquivos: Arquivos, agora: number, paradaDesde: number |
     // Uma verificação que terminou grava os dois arquivos; o schedule enable grava só o status.time.
     verificadoEm: arquivos.tsv === undefined ? null : lerHora(arquivos.time),
     motivo,
+    foraDaVerificacao: lerForaDaVerificacao(arquivos.log),
     intervalo,
     visto: agora,
     casa,

@@ -23,6 +23,8 @@ export type Resumo = {
   verificadoEm: number | null
   /** por que a última verificação deu erro */
   motivo: string | null
+  /** quantos projetos a última verificação deixou de fora por segurança (aviso no check.log, não é erro) */
+  foraDaVerificacao: number
   /** de quantos em quantos minutos a verificação roda */
   intervalo: number
   /** quando este resumo foi feito, em milissegundos */
