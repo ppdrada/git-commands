@@ -66,6 +66,8 @@ Se preferir, faça o mesmo dentro do Claude Code:
 
 No Claude Code 2.1.275 ou mais novo, também dá para instalar num passo só: `/plugin install git-commands --marketplace ppdrada/git-commands`.
 
+O painel `git-commands-painel` vem junto automaticamente (é uma dependência do git-commands). Numa versão do Claude Code que ainda não aceita mods, ele fica instalado mas simplesmente não aparece.
+
 **2. Feche e abra o Claude Code de novo**, para ele carregar o plugin.
 
 **3. Confira se está ligado:**
@@ -260,9 +262,9 @@ git-commands ssh remote ~/git/site https # volta um projeto para HTTPS
 
 A verificação automática continua buscando por HTTPS e nunca precisa da senha da chave.
 
-### Painel (opcional)
+### Painel
 
-O `git-commands-painel` é um plugin à parte que mostra o estado dos seus projetos sem você precisar perguntar:
+O `git-commands-painel` vem instalado junto com o git-commands e mostra o estado dos seus projetos sem você precisar perguntar:
 
 - **Na linha de status**, embaixo da caixa de mensagem: "git-commands: 2 com novidades", "git-commands: em dia" ou "git-commands: verificação parada".
 - **Uma faixa acima da caixa de mensagem**, só quando há novidades, com os botões **Ver agora** (pergunta ao Claude "tem algo novo nos meus projetos?") e **Depois** (esconde a faixa até a lista mudar).
@@ -271,13 +273,9 @@ O `git-commands-painel` é um plugin à parte que mostra o estado dos seus proje
 
 A pasta é contada a partir da pasta do usuário: por exemplo, `Documents\` em cinza e depois `site (main): com novidades (3)` na cor do estado (no Windows, ela aparece com o nome que tem no disco, mesmo que o Explorador mostre "Documentos"). Um projeto direto na pasta do usuário aparece sem pasta, e um que está fora dela mostra a pasta inteira (como `D:\projetos\`). Assim dá para diferenciar duas cópias do mesmo projeto.
 
-O painel só lê o que a [verificação automática](#verificação-automática) grava em `~/.git-commands`: não usa a internet, não roda git e nunca atualiza nada. Por isso, ligue a verificação automática antes. Para instalar, no terminal:
+O painel só lê o que a [verificação automática](#verificação-automática) grava em `~/.git-commands`: não usa a internet, não roda git e nunca atualiza nada. Por isso, ligue a verificação automática para ele ter o que mostrar.
 
-```bash
-claude plugin install git-commands-painel@git-commands
-```
-
-Dentro do Claude Code, o mesmo é `/plugin install git-commands-painel@git-commands`. No app do Claude, clique no **+** ao lado da caixa de mensagem, depois em **Plugins**, e adicione o `git-commands-painel`. Depois, feche e abra o Claude Code de novo. Numa versão do Claude Code que ainda não aceita mods, o painel simplesmente não aparece.
+Como ele vem junto com o git-commands, você não precisa instalá-lo à parte — depois de instalar o git-commands, feche e abra o Claude Code. Numa versão do Claude Code que ainda não aceita mods, o painel simplesmente não aparece.
 
 ## Comandos do git-commands
 
@@ -399,7 +397,7 @@ Desligue o modo automático só nele: `git-commands proactive off`. As skills co
 ```bash
 claude plugin marketplace update git-commands
 claude plugin update git-commands@git-commands
-claude plugin update git-commands-painel@git-commands   # se você instalou o painel
+claude plugin update git-commands-painel@git-commands
 ```
 
 **Desinstalar:**
@@ -409,7 +407,7 @@ claude plugin update git-commands-painel@git-commands   # se você instalou o pa
 
    ```bash
    claude plugin uninstall git-commands@git-commands
-   claude plugin uninstall git-commands-painel@git-commands   # se você instalou o painel
+   claude plugin uninstall git-commands-painel@git-commands
    ```
 
 3. Se quiser começar do zero numa próxima instalação, apague a pasta `~/.git-commands`.
@@ -438,7 +436,7 @@ plugins/git-commands/
   scheduler/                     o que o agendador do sistema roda
   reference/                     regras, glossário de conceitos e modelos de .gitignore
   evals/                         avaliações de comportamento das skills
-plugins/git-commands-painel/     o painel (opcional), um mod do Claude Code em TypeScript
+plugins/git-commands-painel/     o painel (vem junto com o git-commands), um mod do Claude Code em TypeScript
   hooks/                         a leitura dos arquivos, os textos e o que aparece na tela
   types/                         o que o painel guarda durante a sessão
   tests/                         os testes do painel
