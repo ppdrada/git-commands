@@ -5,6 +5,7 @@ import {
   entradas,
   lerConfig,
   lerErro,
+  lerForaDaVerificacao,
   lerHora,
   lerProjetos,
   ordenarParaOPainel,
@@ -88,10 +89,34 @@ test('resumir: desligada, erro, esperando, parada e ok', () => {
     ],
     verificadoEm: AGORA - 5 * MINUTO,
     motivo: null,
+    foraDaVerificacao: 0,
     intervalo: 30,
     visto: AGORA,
     casa: null,
   })
+})
+
+const AVISO_FORA = (p: string) =>
+  `git-commands: aviso: projeto fora da verificação por conter configuração que roda programas: ${p} — para incluir, rode git-commands folders add ${p}`
+
+test('lerForaDaVerificacao conta só os excluídos da última verificação', () => {
+  expect(lerForaDaVerificacao(undefined)).toBe(0)
+  expect(lerForaDaVerificacao('2026-10-26 06:19:09 verificação ok\n')).toBe(0)
+  // Uma rodada com dois excluídos.
+  expect(lerForaDaVerificacao(`${AVISO_FORA('/a')}\n${AVISO_FORA('/b')}\n2026-10-26 06:19:09 verificação ok\n`)).toBe(2)
+  // O check.log acumula: não soma o mesmo projeto das rodadas anteriores.
+  expect(
+    lerForaDaVerificacao(`${AVISO_FORA('/a')}\n2026-10-26 06:00:00 verificação ok\n${AVISO_FORA('/a')}\n2026-10-26 06:30:00 verificação ok\n`),
+  ).toBe(1)
+  // A última rodada não excluiu ninguém, mesmo que uma anterior tenha excluído.
+  expect(lerForaDaVerificacao(`${AVISO_FORA('/a')}\n2026-10-26 06:00:00 verificação ok\n2026-10-26 06:30:00 verificação ok\n`)).toBe(0)
+  // Uma rodada que terminou em erro também conta os avisos dela.
+  expect(lerForaDaVerificacao(`2026-10-26 06:00:00 verificação ok\n${AVISO_FORA('/a')}\n2026-10-26 06:30:00 erro 1\n`)).toBe(1)
+})
+
+test('resumir conta os projetos fora da verificação', () => {
+  expect(resumir(arquivos({ log: `${AVISO_FORA('/a')}\n2026-10-26 06:19:09 verificação ok\n` }), AGORA, null).foraDaVerificacao).toBe(1)
+  expect(resumir(arquivos(), AGORA, null).foraDaVerificacao).toBe(0)
 })
 
 test('resumir copia a pasta do usuário para o resumo', () => {

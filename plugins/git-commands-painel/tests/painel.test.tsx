@@ -490,6 +490,38 @@ test('sem projetos do GitHub, o painel diz isso', async ($, on) => {
   await ui.unmount()
 })
 
+const FORA_DA_VERIFICACAO =
+  'git-commands: aviso: projeto fora da verificação por conter configuração que roda programas: C:/git/mau — para incluir, rode git-commands folders add C:/git/mau\n2026-10-26 06:19:09 verificação ok\n'
+
+test('o painel avisa os projetos deixados de fora por segurança, sem virar erro', async ($, on) => {
+  mock.clock(on, { now: AGORA })
+  mock.env(on, { HOME: '/casa' })
+  const m = mundo(on, arquivos({ 'check.log': FORA_DA_VERIFICACAO }))
+  await abrir($)
+
+  // Segue verde: a linha de status não vira erro.
+  expect(m.status.at(-1)).toBe('git-commands: 1 com novidades')
+
+  await $.command.run(PAINEL_PEDIDO)
+  const ui = await $.ui.mount({ ...PAINEL, surface: 'desktop' })
+  const linha = await ui.find({ type: 'Text', text: /fora da verificação/ })
+  expect(linha?.text).toBe('1 projeto fora da verificação por segurança — veja o check.log ou use git-commands folders add')
+  expect(linha?.props).toEqual({ color: 'warning' })
+  await ui.unmount()
+})
+
+test('sem exclusões, o painel não mostra a linha de fora da verificação', async ($, on) => {
+  mock.clock(on, { now: AGORA })
+  mock.env(on, { HOME: '/casa' })
+  mundo(on, arquivos())
+  await abrir($)
+  await $.command.run(PAINEL_PEDIDO)
+
+  const ui = await $.ui.mount({ ...PAINEL, surface: 'desktop' })
+  expect(await ui.find({ type: 'Text', text: /fora da verificação/ })).toBeUndefined()
+  await ui.unmount()
+})
+
 test('quando não dá para abrir, o comando diz isso', async ($, on) => {
   mock.clock(on, { now: AGORA })
   mock.env(on, { HOME: '/casa' })
