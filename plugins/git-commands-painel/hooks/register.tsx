@@ -19,6 +19,8 @@ import type { Arquivos } from './resumo'
 import {
   cabecalhoDoPainel,
   corDoEstado,
+  dicaDeOutraPasta,
+  linhaDaPastaDoUsuario,
   linhaDeStatus,
   linhaForaDaVerificacao,
   listaDeNovidades,
@@ -167,9 +169,12 @@ export const register: Register = on => {
     if (atual === null) return <Text dimColor>Lendo o estado dos projetos…</Text>
 
     const semProjetos = atual.verificadoEm !== null && atual.situacao !== 'desligada' && atual.projetos.length === 0
+    // Desligada, a verificação não procura em lugar nenhum: a pasta do usuário e a dica não valem.
+    const ligada = atual.situacao !== 'desligada'
     return (
       <Box flexDirection="column" gap={1}>
         <Text dimColor>{cabecalhoDoPainel(atual)}</Text>
+        {ligada && atual.casa !== null && <Text dimColor>{linhaDaPastaDoUsuario(atual.casa)}</Text>}
         {atual.foraDaVerificacao > 0 && <Text color="warning">{linhaForaDaVerificacao(atual.foraDaVerificacao)}</Text>}
         {atual.projetos.length > 0 && (
           <Box flexDirection="column">
@@ -192,6 +197,7 @@ export const register: Register = on => {
         {comNovidades(atual.projetos).length > 0 && (
           <Text dimColor>Para ver e atualizar, peça ao Claude: "{PERGUNTA}"</Text>
         )}
+        {ligada && <Text dimColor>{dicaDeOutraPasta(atual.casa)}</Text>}
       </Box>
     )
   })
