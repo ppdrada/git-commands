@@ -105,6 +105,22 @@ Fale com o Claude do seu jeito. Ele reconhece o que você quer e usa a skill cer
 
 Também dá para chamar uma skill direto: `/git-commands:novo-projeto`, `/git-commands:salvar` e assim por diante.
 
+### Atalhos
+
+Se você já sabe o comando que quer, digite `/git-commands:` e escolha um atalho no menu:
+
+![O menu que aparece ao digitar /git-commands:, com os seis atalhos e o que cada um faz](docs/imagens/atalhos.svg)
+
+| Atalho | O que faz |
+|---|---|
+| `/git-commands:branch` | cria uma branch |
+| `/git-commands:commit` | salva o trabalho num commit, sem enviar |
+| `/git-commands:push` | envia os commits para o GitHub |
+| `/git-commands:pull` | traz as novidades do GitHub |
+| `/git-commands:pr` ou `/git-commands:pull-request` | abre, mostra ou junta um pull request |
+
+Se nenhum outro comando usar o mesmo nome, dá para digitar só `/pr`, `/pull` e assim por diante. Os atalhos seguem as mesmas regras das skills: explicam cada conceito na primeira vez e esperam o seu ok antes do commit, do envio e do PR. Eles só rodam quando você digita, então não atrapalham o Claude a escolher a skill sozinho.
+
 ### Exemplo: do zero ao GitHub
 
 > **Você:** quero colocar meu site no GitHub
@@ -427,7 +443,8 @@ Se você já desinstalou com a verificação ligada, remova o agendamento à mã
 plugins/git-commands/
   .claude-plugin/plugin.json     nome, versão e descrição do plugin
   skills/                        configurar, novo-projeto, salvar, branch-e-pr, atualizar,
-                                 comandos e verificacao-automatica
+                                 comandos, verificacao-automatica e os atalhos (branch,
+                                 commit, push, pull, pr e pull-request)
   agents/git.md                  ajudante que resume as novidades dos repositórios (só lê)
   hooks/                         session-start, guard e pre-edit (pelo run-hook.cmd)
   bin/git-commands               o executável que as skills usam

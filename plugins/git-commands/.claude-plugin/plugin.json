@@ -1,7 +1,7 @@
 {
   "name": "git-commands",
   "displayName": "Git Commands",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Git e GitHub para quem está começando: o Claude faz os comandos, explica e pede confirmação.",
   "author": {
     "name": "ppdrada"
