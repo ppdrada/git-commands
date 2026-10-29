@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="300" viewBox="0 0 760 300" role="img" aria-labelledby="titulo descricao">
+  <title id="titulo">Os atalhos do git-commands</title>
+  <desc id="descricao">Exemplo do menu que aparece ao digitar /git-commands: na caixa de mensagem: os seis atalhos, cada um com o que faz.</desc>
+  <style>
+    text { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, "DejaVu Sans Mono", monospace; font-size: 14px; }
+    .titulo { fill: #e6e6e6; font-weight: 600; }
+    .cinza { fill: #8a8a8a; }
+    .normal { fill: #e6e6e6; }
+    .amarelo { fill: #e5c07b; }
+  </style>
+  <rect x="0.5" y="0.5" width="759" height="299" rx="10" fill="#1e1e1e" stroke="#3c3c3c"/>
+  <path d="M10.5 0.5 H749.5 A10 10 0 0 1 759.5 10.5 V44.5 H0.5 V10.5 A10 10 0 0 1 10.5 0.5 Z" fill="#2b2b2b" stroke="#3c3c3c"/>
+  <text x="24" y="28" class="titulo">Atalhos do git-commands</text>
+
+  <rect x="16.5" y="60.5" width="727" height="40" rx="6" fill="#252525" stroke="#4a4a4a"/>
+  <text x="32" y="85"><tspan class="cinza">&gt; </tspan><tspan class="normal">/git-commands:█</tspan></text>
+
+  <rect x="16.5" y="116.5" width="727" height="28" rx="4" fill="#2f2f2f"/>
+  <text x="32" y="136" class="amarelo">/git-commands:branch</text>
+  <text x="272" y="136" class="normal">Cria uma branch para uma mudança nova.</text>
+  <text x="32" y="164" class="normal">/git-commands:commit</text>
+  <text x="272" y="164" class="cinza">Salva o trabalho num commit, sem enviar para o GitHub.</text>
+  <text x="32" y="192" class="normal">/git-commands:push</text>
+  <text x="272" y="192" class="cinza">Envia os commits para o GitHub.</text>
+  <text x="32" y="220" class="normal">/git-commands:pull</text>
+  <text x="272" y="220" class="cinza">Traz as novidades do GitHub.</text>
+  <text x="32" y="248" class="normal">/git-commands:pr</text>
+  <text x="272" y="248" class="cinza">Abre, mostra ou junta um pull request (PR).</text>
+  <text x="32" y="276" class="normal">/git-commands:pull-request</text>
+  <text x="272" y="276" class="cinza">Abre, mostra ou junta um pull request (PR).</text>
+</svg>
