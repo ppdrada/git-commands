@@ -316,6 +316,11 @@ const PAINEL_PEDIDO = {
   presentation: { isFullscreen: false, columns: 120 },
 } as const
 
+// Com a verificação ligada, o painel diz de que pasta conta as pastas e como pedir uma pasta de fora.
+const CASA = 'Pasta do usuário: /casa'
+const DICA = 'Projeto em outra pasta? Peça ao Claude: "monitora também a pasta /caminho/da/pasta"'
+const DICA_WINDOWS = 'Projeto em outra pasta? Peça ao Claude: "monitora também a pasta D:/projetos"'
+
 test('/painel abre o painel com o estado de cada projeto, em todas as telas', async ($, on) => {
   mock.clock(on, { now: AGORA })
   mock.env(on, { HOME: '/casa' })
@@ -330,11 +335,13 @@ test('/painel abre o painel com o estado de cada projeto, em todas as telas', as
     const ui = await $.ui.mount({ ...PAINEL, surface })
     expect((await ui.findAll({ type: 'Text' })).map(t => t.text)).toEqual([
       'Última verificação há 5 minutos. Ela roda a cada 30 minutos.',
+      CASA,
       'C:\\git\\',
       'site (main): com novidades (3)',
       'C:\\git\\',
       'api (main): em dia',
       'Para ver e atualizar, peça ao Claude: "tem algo novo nos meus projetos?"',
+      DICA,
     ])
     await ui.unmount()
   }
@@ -360,11 +367,13 @@ test('o painel mostra em cinza a pasta de cada projeto, contada a partir da past
     const textos = await ui.findAll({ type: 'Text' })
     expect(textos.map(t => t.text)).toEqual([
       'Última verificação há 5 minutos. Ela roda a cada 30 minutos.',
+      CASA,
       'Documents/',
       'site (main): com novidades (3)',
       'Documents/git/',
       'api (main): em dia',
       'Para ver e atualizar, peça ao Claude: "tem algo novo nos meus projetos?"',
+      DICA,
     ])
     // A pasta vai em cinza e o texto do projeto fica só na cor do estado.
     expect(textos.find(t => t.text === 'Documents/')?.props).toEqual({ dimColor: true })
@@ -399,10 +408,12 @@ test('um projeto direto na pasta do usuário aparece sem pasta na frente', async
   const ui = await $.ui.mount({ ...PAINEL, surface: 'desktop' })
   expect((await ui.findAll({ type: 'Text' })).map(t => t.text)).toEqual([
     'Última verificação há 5 minutos. Ela roda a cada 30 minutos.',
+    CASA,
     '/srv/projetos/',
     'api (main): com novidades (2)',
     'blog (main): em dia',
     'Para ver e atualizar, peça ao Claude: "tem algo novo nos meus projetos?"',
+    DICA,
   ])
   expect(filhosDaLista(await ui.findAll({ type: 'Box' }))).toMatchObject([
     { type: 'Box', props: { gap: 1 }, children: [{ props: { dimColor: true } }, { props: { color: 'warning' } }] },
@@ -421,28 +432,36 @@ const CASAS = [
     variaveis: { HOME: '/casa', USERPROFILE: 'C:\\Users\\perfil' },
     caminho: '/casa/Documents/site',
     pasta: 'Documents/',
+    linhaDaCasa: CASA,
+    dica: DICA,
   },
   {
     quem: 'USERPROFILE',
     variaveis: { GIT_COMMANDS_HOME: ESTADO, USERPROFILE: 'C:\\Users\\pessoa' },
     caminho: 'C:/Users/pessoa/Documents/site',
     pasta: 'Documents\\',
+    linhaDaCasa: 'Pasta do usuário: C:\\Users\\pessoa',
+    dica: DICA_WINDOWS,
   },
   {
     quem: 'USERPROFILE com HOME vazio',
     variaveis: { GIT_COMMANDS_HOME: ESTADO, HOME: '', USERPROFILE: 'C:\\Users\\pessoa' },
     caminho: 'C:/Users/pessoa/Documents/site',
     pasta: 'Documents\\',
+    linhaDaCasa: 'Pasta do usuário: C:\\Users\\pessoa',
+    dica: DICA_WINDOWS,
   },
   {
     quem: 'HOME com GIT_COMMANDS_HOME',
     variaveis: { GIT_COMMANDS_HOME: ESTADO, HOME: '/casa' },
     caminho: '/casa/Documents/site',
     pasta: 'Documents/',
+    linhaDaCasa: CASA,
+    dica: DICA,
   },
 ] as const
 
-for (const { quem, variaveis, caminho, pasta } of CASAS) {
+for (const { quem, variaveis, caminho, pasta, linhaDaCasa, dica } of CASAS) {
   test(`o painel conta a pasta a partir da pasta do usuário (${quem})`, async ($, on) => {
     mock.clock(on, { now: AGORA })
     mock.env(on, variaveis)
@@ -453,13 +472,49 @@ for (const { quem, variaveis, caminho, pasta } of CASAS) {
     const ui = await $.ui.mount({ ...PAINEL, surface: 'desktop' })
     expect((await ui.findAll({ type: 'Text' })).map(t => t.text)).toEqual([
       'Última verificação há 5 minutos. Ela roda a cada 30 minutos.',
+      linhaDaCasa,
       pasta,
       'site (main): com novidades (3)',
       'Para ver e atualizar, peça ao Claude: "tem algo novo nos meus projetos?"',
+      dica,
     ])
     await ui.unmount()
   })
 }
+
+test('a linha da pasta do usuário e a dica de outra pasta vão em cinza', async ($, on) => {
+  mock.clock(on, { now: AGORA })
+  mock.env(on, { HOME: '/casa' })
+  mundo(on, arquivos({ 'status.tsv': NA_CASA }))
+  await abrir($)
+  await $.command.run(PAINEL_PEDIDO)
+
+  const ui = await $.ui.mount({ ...PAINEL, surface: 'desktop' })
+  const textos = await ui.findAll({ type: 'Text' })
+  expect(textos.find(t => t.text === CASA)?.props).toEqual({ dimColor: true })
+  expect(textos.find(t => t.text === DICA)?.props).toEqual({ dimColor: true })
+  await ui.unmount()
+})
+
+test('sem a pasta do usuário, o painel não mostra a linha dela', async ($, on) => {
+  mock.clock(on, { now: AGORA })
+  mock.env(on, { GIT_COMMANDS_HOME: ESTADO })
+  mundo(on, arquivos())
+  await abrir($)
+  await $.command.run(PAINEL_PEDIDO)
+
+  const ui = await $.ui.mount({ ...PAINEL, surface: 'desktop' })
+  expect((await ui.findAll({ type: 'Text' })).map(t => t.text)).toEqual([
+    'Última verificação há 5 minutos. Ela roda a cada 30 minutos.',
+    'C:\\git\\',
+    'site (main): com novidades (3)',
+    'C:\\git\\',
+    'api (main): em dia',
+    'Para ver e atualizar, peça ao Claude: "tem algo novo nos meus projetos?"',
+    DICA,
+  ])
+  await ui.unmount()
+})
 
 test('o painel explica quando a verificação está desligada', async ($, on) => {
   mock.clock(on, { now: AGORA })
@@ -485,7 +540,9 @@ test('sem projetos do GitHub, o painel diz isso', async ($, on) => {
   const ui = await $.ui.mount({ ...PAINEL, surface: 'terminal' })
   expect((await ui.findAll({ type: 'Text' })).map(t => t.text)).toEqual([
     'Última verificação há 5 minutos. Ela roda a cada 30 minutos.',
+    CASA,
     'Nenhum projeto do GitHub encontrado.',
+    DICA,
   ])
   await ui.unmount()
 })
@@ -578,7 +635,7 @@ test('logo depois de ligar a verificação, o painel espera a primeira', async (
 
   expect(m.status.at(-1)).toBe('git-commands: esperando a verificação')
   const ui = await $.ui.mount({ ...PAINEL, surface: 'desktop' })
-  expect((await ui.findAll({ type: 'Text' })).map(t => t.text)).toEqual(['Esperando a primeira verificação.'])
+  expect((await ui.findAll({ type: 'Text' })).map(t => t.text)).toEqual(['Esperando a primeira verificação.', CASA, DICA])
   await ui.unmount()
 })
 

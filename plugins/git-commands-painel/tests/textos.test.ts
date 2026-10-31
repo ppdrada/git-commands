@@ -3,7 +3,9 @@ import { expect, test } from 'claude-code/testing'
 import {
   cabecalhoDoPainel,
   corDoEstado,
+  dicaDeOutraPasta,
   haQuanto,
+  linhaDaPastaDoUsuario,
   linhaDeStatus,
   linhaForaDaVerificacao,
   listaDeNovidades,
@@ -153,6 +155,24 @@ test('pastaDoProjeto sem a pasta do usuário mostra o caminho inteiro da pasta',
   expect(pastaDoProjeto('/c/git/site', null)).toBe('C:\\git\\')
   expect(pastaDoProjeto('/Users/pessoa/projetos/site', null)).toBe('/Users/pessoa/projetos/')
   expect(pastaDoProjeto('/site', null)).toBe('/')
+})
+
+test('a linha da pasta do usuário, com o separador de cada sistema', () => {
+  for (const casa of ['C:\\Users\\pessoa', 'C:\\Users\\pessoa\\', 'C:/Users/pessoa', '/c/Users/pessoa']) {
+    expect(linhaDaPastaDoUsuario(casa)).toBe('Pasta do usuário: C:\\Users\\pessoa')
+  }
+  expect(linhaDaPastaDoUsuario('/Users/pessoa/')).toBe('Pasta do usuário: /Users/pessoa')
+  expect(linhaDaPastaDoUsuario('/home/pessoa')).toBe('Pasta do usuário: /home/pessoa')
+})
+
+test('a dica de projeto em outra pasta dá um exemplo de pasta do sistema', () => {
+  const windows = 'Projeto em outra pasta? Peça ao Claude: "monitora também a pasta D:/projetos"'
+  const outros = 'Projeto em outra pasta? Peça ao Claude: "monitora também a pasta /caminho/da/pasta"'
+  expect(dicaDeOutraPasta('C:\\Users\\pessoa')).toBe(windows)
+  expect(dicaDeOutraPasta('/c/Users/pessoa')).toBe(windows)
+  expect(dicaDeOutraPasta('/Users/pessoa')).toBe(outros)
+  // Sem a pasta do usuário não dá para saber o sistema.
+  expect(dicaDeOutraPasta(null)).toBe(outros)
 })
 
 test('haQuanto em minutos, horas e dias', () => {

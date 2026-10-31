@@ -287,7 +287,13 @@ O `git-commands-painel` vem instalado junto com o git-commands e mostra o estado
 - **Um aviso rápido** quando uma verificação nova traz novidades.
 - **O comando `/painel`**, que abre ao lado da conversa a lista dos projetos, cada um com a pasta onde está (em cinza), o nome, a branch e o estado.
 
-A pasta é contada a partir da pasta do usuário: por exemplo, `Documents\` em cinza e depois `site (main): com novidades (3)` na cor do estado (no Windows, ela aparece com o nome que tem no disco, mesmo que o Explorador mostre "Documentos"). Um projeto direto na pasta do usuário aparece sem pasta, e um que está fora dela mostra a pasta inteira (como `D:\projetos\`). Assim dá para diferenciar duas cópias do mesmo projeto.
+Um exemplo do `/painel`, com projetos inventados:
+
+![O /painel do git-commands com quatro projetos de exemplo: um com novidades, um com commits para enviar e dois em dia](docs/imagens/painel.svg)
+
+No topo fica a pasta do usuário, e a pasta de cada projeto é contada a partir dela: por exemplo, `Documents\` em cinza e depois `site (main): com novidades (3)` na cor do estado (no Windows, ela aparece com o nome que tem no disco, mesmo que o Explorador mostre "Documentos"). Um projeto direto na pasta do usuário aparece sem pasta, e um que está fora dela mostra a pasta inteira (como `D:\projetos\`). Assim dá para diferenciar duas cópias do mesmo projeto.
+
+No fim, o painel lembra o que fazer com um projeto guardado em outro lugar, como outro disco: peça a pasta dele ao Claude, por exemplo "monitora também a pasta D:/projetos" (veja [Pedir, tirar e ignorar pastas](#pedir-tirar-e-ignorar-pastas)).
 
 O painel só lê o que a [verificação automática](#verificação-automática) grava em `~/.git-commands`: não usa a internet, não roda git e nunca atualiza nada. Por isso, ligue a verificação automática para ele ter o que mostrar.
 

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="350" viewBox="0 0 760 350" role="img" aria-labelledby="titulo descricao">
+  <title id="titulo">O /painel do git-commands</title>
+  <desc id="descricao">Exemplo do painel com projetos inventados: a última verificação, a pasta do usuário, quatro projetos com a pasta em cinza e o estado em cores, e as dicas do fim.</desc>
+  <style>
+    text { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, "DejaVu Sans Mono", monospace; font-size: 14px; }
+    .titulo { fill: #e6e6e6; font-weight: 600; }
+    .cinza { fill: #8a8a8a; }
+    .normal { fill: #e6e6e6; }
+    .amarelo { fill: #e5c07b; }
+    .verde { fill: #7ec699; }
+  </style>
+  <rect x="0.5" y="0.5" width="759" height="349" rx="10" fill="#1e1e1e" stroke="#3c3c3c"/>
+  <path d="M10.5 0.5 H749.5 A10 10 0 0 1 759.5 10.5 V44.5 H0.5 V10.5 A10 10 0 0 1 10.5 0.5 Z" fill="#2b2b2b" stroke="#3c3c3c"/>
+  <text x="24" y="28" class="titulo">git-commands</text>
+
+  <text x="24" y="78" class="cinza">Última verificação há 5 minutos. Ela roda a cada 30 minutos.</text>
+  <text x="24" y="122" class="cinza">Pasta do usuário: C:\Users\voce</text>
+
+  <text x="24" y="166"><tspan class="cinza">Documents\ </tspan><tspan class="amarelo">site (main): com novidades (3)</tspan></text>
+  <text x="24" y="188"><tspan class="cinza">D:\projetos\ </tspan><tspan class="normal">loja (main): 2 commits para enviar</tspan></text>
+  <text x="24" y="210"><tspan class="cinza">Documents\git\ </tspan><tspan class="verde">api (main): em dia</tspan></text>
+  <text x="24" y="232" class="verde">notas (main): em dia</text>
+
+  <text x="24" y="276" class="cinza">Para ver e atualizar, peça ao Claude: "tem algo novo nos meus projetos?"</text>
+  <text x="24" y="320" class="cinza">Projeto em outra pasta? Peça ao Claude: "monitora também a pasta D:/projetos"</text>
+</svg>

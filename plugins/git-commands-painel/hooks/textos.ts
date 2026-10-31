@@ -75,6 +75,21 @@ function normalizar(caminho: string): string {
     .replace(/\/+$/, '')
 }
 
+/** Um caminho já normalizado que começa com a letra da unidade, como os do Windows. */
+const UNIDADE = /^[a-z]:(\/|$)/i
+
+/** De onde o painel conta a pasta de cada projeto: `C:\Users\x` no Windows e `/Users/x` nos outros. */
+export function linhaDaPastaDoUsuario(casa: string): string {
+  const pasta = normalizar(casa)
+  return `Pasta do usuário: ${UNIDADE.test(pasta) ? pasta.replaceAll('/', '\\') : pasta}`
+}
+
+/** Como pedir uma pasta que a busca não alcança, com um exemplo de pasta no jeito do sistema. */
+export function dicaDeOutraPasta(casa: string | null): string {
+  const exemplo = casa !== null && UNIDADE.test(normalizar(casa)) ? 'D:/projetos' : '/caminho/da/pasta'
+  return `Projeto em outra pasta? Peça ao Claude: "monitora também a pasta ${exemplo}"`
+}
+
 /**
  * A pasta onde o projeto está, terminada no separador, para aparecer em cinza antes do nome.
  * O separador é `\` quando o caminho tem letra de unidade (`C:/...` ou o `/c/...` do Git Bash) e `/` nos outros.
@@ -86,7 +101,7 @@ export function pastaDoProjeto(caminho: string, casa: string | null): string {
   const fim = projeto.lastIndexOf('/')
   if (fim < 0) return ''
   const pasta = projeto.slice(0, fim)
-  const comUnidade = /^[a-z]:(\/|$)/i.test(projeto)
+  const comUnidade = UNIDADE.test(projeto)
   const separador = comUnidade ? '\\' : '/'
   const igual = (a: string, b: string) => (comUnidade ? a.toLowerCase() === b.toLowerCase() : a === b)
 

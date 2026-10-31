@@ -1,6 +1,6 @@
 {
   "name": "git-commands-painel",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Painel opcional do git-commands: mostra no Claude quais projetos têm novidades no GitHub. Só lê, nunca atualiza nada.",
   "author": {
     "name": "ppdrada"
